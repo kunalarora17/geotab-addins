@@ -3,94 +3,149 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GPH &amp; Utilization Report</title>
+  <title>GPH &amp; Utilization</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: #f0f2f5; color: #222; font-size: 13px; }
+    body { font-family: "Segoe UI", Arial, sans-serif; background: #f4f6f9; color: #2d3748; font-size: 13px; }
 
-    .hdr { background: #003f72; color: #fff; padding: 11px 18px; }
-    .hdr h1 { font-size: 14px; font-weight: 600; }
-    .hdr p  { font-size: 11px; opacity: .6; margin-top: 2px; }
+    /* Header */
+    .hdr { background: #1a56a0; color: #fff; padding: 10px 16px; border-bottom: 3px solid #1245870; }
+    .hdr h1 { font-size: 15px; font-weight: 600; }
+    .hdr p  { font-size: 11px; opacity: .7; margin-top: 2px; }
 
-    .ctrl { background: #fff; border-bottom: 1px solid #dde1e7; padding: 10px 18px; display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
-    .field { display: flex; flex-direction: column; gap: 3px; }
-    .field label { font-size: 10px; font-weight: 700; color: #667; text-transform: uppercase; letter-spacing: .5px; }
-    .field input[type="date"] { border: 1px solid #ced4da; border-radius: 4px; padding: 5px 9px; font-size: 12px; color: #333; outline: none; }
-    .field input[type="date"]:focus { border-color: #0068b2; }
-    .btn { padding: 6px 15px; border: none; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer; }
-    .btn-run     { background: #0068b2; color: #fff; }
-    .btn-run:disabled, .btn-export:disabled { background: #b0bec5; cursor: not-allowed; }
-    .btn-export  { background: #1e7e34; color: #fff; }
+    /* Controls */
+    .ctrl { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #718096; }
+    .field input[type=date] { border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 9px; font-size: 12px; color: #2d3748; background: #fff; outline: none; width: 140px; }
+    .field input[type=date]:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
+    .btn { height: 30px; padding: 0 14px; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; letter-spacing: .2px; }
+    .btn-run     { background: #1a56a0; color: #fff; }
+    .btn-run:hover     { background: #154480; }
+    .btn-export  { background: #276749; color: #fff; }
+    .btn-export:hover  { background: #1f5238; }
+    .btn:disabled { background: #a0aec0; cursor: not-allowed; }
 
-    .status { margin: 8px 18px 0; padding: 7px 11px; border-radius: 4px; font-size: 12px; display: none; border-left: 3px solid #ffc107; background: #fff8e1; }
-    .status.err  { border-color: #e53935; background: #ffebee; color: #b71c1c; }
+    /* Status */
+    .status { margin: 8px 16px 0; padding: 7px 12px; border-radius: 5px; font-size: 12px; display: none; background: #fefcbf; border-left: 3px solid #d69e2e; }
+    .status.err { background: #fed7d7; border-color: #e53e3e; color: #742a2a; }
 
-    .summary { margin: 8px 18px 0; padding: 7px 14px; background: #fff; border: 1px solid #dde1e7; border-radius: 4px; font-size: 12px; color: #555; display: none; gap: 22px; flex-wrap: wrap; }
+    /* Summary bar */
+    .summary { display: none; margin: 8px 16px 0; padding: 6px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 5px; font-size: 12px; color: #4a5568; gap: 20px; flex-wrap: wrap; }
     .summary.show { display: flex; }
-    .summary strong { color: #111; }
+    .summary b { color: #1a202c; }
 
-    .tbl-wrap { padding: 10px 18px 20px; overflow-x: auto; }
-    .no-data { text-align: center; padding: 40px; color: #aaa; display: none; }
+    /* Table wrapper — horizontal scroll */
+    .tbl-outer { padding: 10px 16px 20px; overflow-x: auto; }
+    .no-data { text-align: center; padding: 48px 0; color: #a0aec0; font-size: 13px; display: none; }
 
-    table { border-collapse: collapse; font-size: 12px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.09); border-radius: 5px; overflow: hidden; min-width: 100%; }
+    table {
+      border-collapse: collapse;
+      font-size: 12px;
+      table-layout: fixed;
+      min-width: 1100px;
+    }
 
-    thead th { padding: 8px 12px; font-size: 11px; font-weight: 700; white-space: nowrap; text-align: right; color: #fff; background: #003f72; border-right: 1px solid rgba(255,255,255,.12); }
+    /* Column widths */
+    col.c-name  { width: 130px; }
+    col.c-date  { width: 100px; }
+    col.c-num   { width: 105px; }
+    col.c-util  { width: 130px; }
+
+    thead tr th {
+      padding: 8px 10px;
+      font-size: 11px; font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+      border-bottom: 2px solid #fff;
+      border-right: 1px solid rgba(255,255,255,.25);
+    }
     thead th:first-child, thead th:nth-child(2) { text-align: left; }
-    thead th.g-fuel { background: #005a96; }
-    thead th.g-ev   { background: #2e7d32; }
-    thead th.g-util { background: #4a3080; }
+    thead th:last-child { border-right: none; }
 
-    tbody tr:nth-child(even) td { background: #f7f9fc; }
-    tbody tr:hover td { background: #eaf2fb !important; }
-    td { padding: 5px 12px; border-bottom: 1px solid #eee; white-space: nowrap; text-align: right; border-right: 1px solid #f0f0f0; }
-    td:first-child, td:nth-child(2) { text-align: left; }
-    td.na { color: #ccc; }
+    /* Header section colours */
+    .h-base { background: #2d3a4e; color: #fff; }
+    .h-fuel { background: #1a56a0; color: #fff; }
+    .h-ev   { background: #276749; color: #fff; }
+    .h-util { background: #553c9a; color: #fff; }
 
-    .util-cell { display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
-    .util-bar  { width: 40px; height: 7px; background: #e0e0e0; border-radius: 4px; overflow: hidden; flex-shrink: 0; }
+    tbody tr { border-bottom: 1px solid #e8ecf0; }
+    tbody tr:nth-child(even) { background: #f7fafc; }
+    tbody tr:hover { background: #ebf4ff !important; }
+
+    tbody td {
+      padding: 6px 10px;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border-right: 1px solid #edf2f7;
+      font-variant-numeric: tabular-nums;
+    }
+    tbody td:first-child, tbody td:nth-child(2) { text-align: left; }
+    tbody td:last-child { border-right: none; }
+    tbody td.na { color: #cbd5e0; text-align: center; }
+
+    /* Utilization cell */
+    .util-cell { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+    .util-bar  { flex-shrink: 0; width: 46px; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .util-fill { height: 100%; border-radius: 4px; }
-    .util-txt  { font-weight: 600; min-width: 42px; text-align: right; }
+    .util-lbl  { font-weight: 700; font-size: 12px; min-width: 40px; text-align: right; }
   </style>
 </head>
 <body>
 
 <div class="hdr">
   <h1>GPH &amp; Utilization Report</h1>
-  <p>Fuel economy &bull; EV energy &bull; Asset utilization (21.7 hr threshold)</p>
+  <p>Fuel &bull; EV energy &bull; Utilization (21.7 hr threshold)</p>
 </div>
 
 <div class="ctrl">
   <div class="field"><label>From Date</label><input type="date" id="fromDate"></div>
   <div class="field"><label>To Date</label><input type="date" id="toDate"></div>
-  <button class="btn btn-run"    id="runBtn"    style="margin-bottom:1px">Run Report</button>
-  <button class="btn btn-export" id="exportBtn" style="margin-bottom:1px" disabled>Export to Excel</button>
+  <button class="btn btn-run"    id="runBtn"    style="margin-bottom:0">Run Report</button>
+  <button class="btn btn-export" id="exportBtn" style="margin-bottom:0" disabled>Export to Excel</button>
 </div>
 
 <div class="status" id="status"></div>
 
 <div class="summary" id="summary">
-  <span>Rows: <strong id="sCount">—</strong></span>
-  <span>Avg GPH: <strong id="sGph">—</strong></span>
-  <span>Avg Utilization: <strong id="sUtil">—</strong></span>
-  <span id="sEvWrap" style="display:none">Avg kWh/day: <strong id="sKwh">—</strong></span>
+  <span>Rows: <b id="sCount">—</b></span>
+  <span>Avg GPH: <b id="sGph">—</b></span>
+  <span>Avg Utilization: <b id="sUtil">—</b></span>
+  <span id="sEvWrap" style="display:none">Avg kWh/day: <b id="sKwh">—</b></span>
 </div>
 
-<div class="tbl-wrap">
+<div class="tbl-outer">
   <table id="tbl" style="display:none">
+    <colgroup>
+      <col class="c-name">
+      <col class="c-date">
+      <col class="c-num">
+      <col class="c-num">
+      <col class="c-num">
+      <col class="c-num">
+      <col class="c-num">
+      <col class="c-num">
+      <col class="c-num">
+      <col class="c-num" id="col-kwh"   style="display:none">
+      <col class="c-num" id="col-eveco" style="display:none">
+      <col class="c-util">
+    </colgroup>
     <thead>
       <tr>
-        <th style="text-align:left">Asset Name</th>
-        <th style="text-align:left">Date</th>
-        <th>Distance (mi)</th>
-        <th>Driving (hrs)</th>
-        <th>Idling (hrs)</th>
-        <th>Engine ON (hrs)</th>
-        <th class="g-fuel">Fuel Used (gal)</th>
-        <th class="g-fuel">Gallons/Hour</th>
-        <th class="g-fuel">Hours/Gallon</th>
-        <th class="g-ev"   id="th-kwh"   style="display:none">Energy (kWh)</th>
-        <th class="g-ev"   id="th-eveco" style="display:none">kWh / 100 mi</th>
-        <th class="g-util">Utilization</th>
+        <th class="h-base" style="text-align:left">Asset Name</th>
+        <th class="h-base" style="text-align:left">Date</th>
+        <th class="h-base">Distance (mi)</th>
+        <th class="h-base">Driving (hrs)</th>
+        <th class="h-base">Idling (hrs)</th>
+        <th class="h-base">Engine ON (hrs)</th>
+        <th class="h-fuel">Fuel Used (gal)</th>
+        <th class="h-fuel">Gallons / Hour</th>
+        <th class="h-fuel">Hours / Gallon</th>
+        <th class="h-ev" id="th-kwh"   style="display:none">Energy (kWh)</th>
+        <th class="h-ev" id="th-eveco" style="display:none">kWh / 100 mi</th>
+        <th class="h-util">Utilization</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -102,216 +157,162 @@
 <script>
 /* global geotab, XLSX */
 geotab.addin.gphUtilization = function (api, state) {
-  const KM_TO_MI    = 0.621371;
-  const L_TO_GAL    = 1 / 3.78541;
-  const UTIL_THRESH = 21.7;
-  let tableData = [];
-  let hasEv = false;
+  const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, THRESH = 21.7;
+  let data = [], hasEv = false;
 
-  /* ---- helpers ---- */
-  function parseTS(ts) {
+  function pts(ts) {
     if (!ts) return 0;
-    let s = String(ts), days = 0;
-    const dot = s.indexOf('.');
-    if (dot > 0 && dot < s.indexOf(':')) { days = parseInt(s.slice(0, dot), 10); s = s.slice(dot + 1); }
-    const [h, m, sec] = s.split(':').map(parseFloat);
-    return days * 24 + (h || 0) + (m || 0) / 60 + (sec || 0) / 3600;
+    let s = String(ts), d = 0, dot = s.indexOf('.');
+    if (dot > 0 && dot < s.indexOf(':')) { d = parseInt(s.slice(0, dot), 10); s = s.slice(dot + 1); }
+    const [h, m, x] = s.split(':').map(parseFloat);
+    return d * 24 + (h||0) + (m||0)/60 + (x||0)/3600;
   }
-  const dk  = dt  => String(dt).slice(0, 10);
-  const fix = (n, d) => (n == null || isNaN(n)) ? null : +n.toFixed(d);
+  const dk  = dt => String(dt).slice(0, 10);
+  const fix = (n, dp) => (n == null || isNaN(n)) ? null : +n.toFixed(dp);
 
-  function setStatus(msg, isErr) {
+  function status(msg, err) {
     const el = document.getElementById('status');
     if (!msg) { el.style.display = 'none'; return; }
-    el.textContent = msg; el.className = 'status' + (isErr ? ' err' : ''); el.style.display = 'block';
+    el.textContent = msg; el.className = 'status' + (err ? ' err' : ''); el.style.display = 'block';
   }
 
-  /* ---- run ---- */
-  function runReport() {
+  function run() {
     const from = document.getElementById('fromDate').value;
     const to   = document.getElementById('toDate').value;
-    if (!from || !to) { setStatus('Please select a date range.', true); return; }
-
-    const fromISO = from + 'T00:00:00.000Z';
-    const toISO   = to   + 'T23:59:59.999Z';
-
-    setStatus('Loading…');
-    document.getElementById('runBtn').disabled    = true;
+    if (!from || !to) { status('Select a date range.', true); return; }
+    const fISO = from + 'T00:00:00.000Z', tISO = to + 'T23:59:59.999Z';
+    status('Loading devices…');
+    document.getElementById('runBtn').disabled = true;
     document.getElementById('exportBtn').disabled = true;
-    document.getElementById('tbl').style.display  = 'none';
+    document.getElementById('tbl').style.display = 'none';
     document.getElementById('noData').style.display = 'none';
     document.getElementById('summary').classList.remove('show');
 
-    // Step 1: fetch all devices to build name lookup
-    api.call('Get', { typeName: 'Device', search: {}, resultsLimit: 50000 },
-      function (devices) {
-        const nameMap = {};
-        (devices || []).forEach(d => { nameMap[d.id] = d.name || d.id; });
-
-        setStatus('Fetching trip data…');
-
-        // Step 2: fetch trips
-        api.call('Get', { typeName: 'Trip', search: { fromDate: fromISO, toDate: toISO }, resultsLimit: 50000 },
-          function (trips) {
-            setStatus('Fetching fuel & energy data…');
-
-            // Step 3: fetch fuel + EV energy
-            api.call('Get', { typeName: 'FuelAndEnergyUsed', search: { fromDate: fromISO, toDate: toISO }, resultsLimit: 50000 },
-              function (fuelRecs) { processData(nameMap, trips || [], fuelRecs || []); },
-              function ()         { processData(nameMap, trips || [], []); }
-            );
-          },
-          function (err) { setStatus('Error fetching trips: ' + err, true); document.getElementById('runBtn').disabled = false; }
+    api.call('Get', { typeName: 'Device', search: {}, resultsLimit: 50000 }, function(devs) {
+      const nm = {};
+      (devs||[]).forEach(d => { nm[d.id] = d.name || d.id; });
+      status('Loading trips…');
+      api.call('Get', { typeName: 'Trip', search: { fromDate: fISO, toDate: tISO }, resultsLimit: 50000 }, function(trips) {
+        status('Loading fuel & energy…');
+        api.call('Get', { typeName: 'FuelAndEnergyUsed', search: { fromDate: fISO, toDate: tISO }, resultsLimit: 50000 },
+          function(fuel) { process(nm, trips||[], fuel||[]); },
+          function()     { process(nm, trips||[], []); }
         );
-      },
-      function (err) { setStatus('Error fetching devices: ' + err, true); document.getElementById('runBtn').disabled = false; }
-    );
+      }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
+    }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
-  /* ---- process ---- */
-  function processData(nameMap, trips, fuelRecs) {
-    const tripMap = {};
+  function process(nm, trips, fuel) {
+    const tm = {}, fm = {};
     for (const t of trips) {
-      const key = t.device.id + '|' + dk(t.start);
-      if (!tripMap[key]) tripMap[key] = { id: t.device.id, date: dk(t.start), distKm: 0, drivH: 0, idleH: 0 };
-      tripMap[key].distKm += t.distance || 0;
-      tripMap[key].drivH  += parseTS(t.drivingDuration);
-      tripMap[key].idleH  += parseTS(t.idlingDuration);
+      const k = t.device.id + '|' + dk(t.start);
+      if (!tm[k]) tm[k] = { id: t.device.id, date: dk(t.start), distKm: 0, dH: 0, iH: 0 };
+      tm[k].distKm += t.distance || 0;
+      tm[k].dH += pts(t.drivingDuration);
+      tm[k].iH += pts(t.idlingDuration);
     }
-
-    const fuelMap = {};
-    for (const f of fuelRecs) {
-      const key = f.device.id + '|' + dk(f.dateTime);
-      if (!fuelMap[key]) fuelMap[key] = { fuelL: 0, kWh: 0 };
-      fuelMap[key].fuelL += f.totalFuelUsed      || 0;
-      fuelMap[key].kWh   += f.totalEnergyUsedKwh  || 0;
+    for (const f of fuel) {
+      const k = f.device.id + '|' + dk(f.dateTime);
+      if (!fm[k]) fm[k] = { fL: 0, kWh: 0 };
+      fm[k].fL  += f.totalFuelUsed      || 0;
+      fm[k].kWh += f.totalEnergyUsedKwh  || 0;
     }
-
     hasEv = false;
-    tableData = Object.entries(tripMap).map(([key, t]) => {
-      const fe      = fuelMap[key] || { fuelL: 0, kWh: 0 };
-      const fuelGal = fe.fuelL * L_TO_GAL;
-      const kWh     = fe.kWh;
-      const engH    = t.drivH + t.idleH;
-      const distMi  = t.distKm * KM_TO_MI;
-      const gph     = (engH > 0 && fuelGal > 0) ? fuelGal / engH   : null;
-      const hpg     = (fuelGal > 0 && engH > 0) ? engH   / fuelGal : null;
-      const evEcon  = (kWh > 0 && distMi > 0)   ? (kWh / distMi) * 100 : null;
-      if (kWh > 0) hasEv = true;
+    data = Object.entries(tm).map(([k, t]) => {
+      const fe = fm[k] || { fL: 0, kWh: 0 };
+      const fg = fe.fL * L_TO_GAL, kw = fe.kWh;
+      const eH = t.dH + t.iH, mi = t.distKm * KM_TO_MI;
+      if (kw > 0) hasEv = true;
       return {
-        name: nameMap[t.id] || t.id,
-        date: t.date, distMi, drivH: t.drivH, idleH: t.idleH, engH,
-        fuelGal: fuelGal > 0 ? fuelGal : null, gph, hpg,
-        kWh: kWh > 0 ? kWh : null, evEcon,
-        util: t.drivH / UTIL_THRESH
+        name: nm[t.id] || t.id, date: t.date,
+        mi, dH: t.dH, iH: t.iH, eH,
+        fg: fg > 0 ? fg : null,
+        gph:  (eH > 0 && fg > 0) ? fg / eH   : null,
+        hpg:  (fg > 0 && eH > 0) ? eH / fg   : null,
+        kw:   kw > 0 ? kw : null,
+        eco:  (kw > 0 && mi > 0) ? (kw/mi)*100 : null,
+        util: t.dH / THRESH
       };
     }).sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
 
-    // Show EV columns only if fleet has EV data
-    ['th-kwh','th-eveco'].forEach(id => { document.getElementById(id).style.display = hasEv ? '' : 'none'; });
-
-    renderTable(tableData);
-    renderSummary(tableData);
-    setStatus(null);
-    document.getElementById('runBtn').disabled    = false;
-    document.getElementById('exportBtn').disabled = tableData.length === 0;
+    ['th-kwh','th-eveco','col-kwh','col-eveco'].forEach(id => {
+      document.getElementById(id).style.display = hasEv ? '' : 'none';
+    });
+    render(data); summary(data); status(null);
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('exportBtn').disabled = data.length === 0;
   }
 
-  /* ---- render ---- */
-  function utilColor(u) { return u >= 1 ? '#1b8a2e' : u >= 0.7 ? '#c77800' : '#c62828'; }
+  function uc(u) { return u >= 1 ? '#276749' : u >= 0.7 ? '#b7791f' : '#c53030'; }
+  function nc(v)  { return v != null ? `<td>${v}</td>` : '<td class="na">—</td>'; }
 
-  function nc(val) { return val != null ? `<td>${val}</td>` : '<td class="na">—</td>'; }
-
-  function renderTable(rows) {
-    const tbody = document.getElementById('tbody');
-    tbody.innerHTML = '';
+  function render(rows) {
+    const tb = document.getElementById('tbody');
+    tb.innerHTML = '';
     if (!rows.length) { document.getElementById('noData').style.display = 'block'; return; }
-
     rows.forEach(r => {
-      const uc   = utilColor(r.util);
-      const barW = Math.min(r.util, 1) * 40;
-      const evCells = hasEv
-        ? nc(r.kWh   != null ? fix(r.kWh, 2)   : null) +
-          nc(r.evEcon != null ? fix(r.evEcon, 2) : null)
-        : '';
-
-      tbody.insertAdjacentHTML('beforeend', `<tr>
-        <td style="text-align:left">${r.name}</td>
-        <td style="text-align:left">${r.date}</td>
-        ${nc(fix(r.distMi,1))} ${nc(fix(r.drivH,2))} ${nc(fix(r.idleH,2))} ${nc(fix(r.engH,2))}
-        ${nc(r.fuelGal != null ? fix(r.fuelGal,3) : null)}
-        ${nc(r.gph  != null ? fix(r.gph,3)  : null)}
-        ${nc(r.hpg  != null ? fix(r.hpg,3)  : null)}
-        ${evCells}
-        <td>
-          <div class="util-cell">
-            <div class="util-bar"><div class="util-fill" style="width:${barW}px;background:${uc}"></div></div>
-            <span class="util-txt" style="color:${uc}">${(r.util*100).toFixed(1)}%</span>
-          </div>
-        </td>
-      </tr>`);
+      const col = uc(r.util), bw = Math.min(r.util, 1) * 46;
+      const ev  = hasEv ? nc(r.kw  != null ? fix(r.kw, 2)  : null) + nc(r.eco != null ? fix(r.eco, 2) : null) : '';
+      tb.insertAdjacentHTML('beforeend',
+        `<tr>
+          <td style="text-align:left">${r.name}</td>
+          <td style="text-align:left">${r.date}</td>
+          ${nc(fix(r.mi,1))} ${nc(fix(r.dH,2))} ${nc(fix(r.iH,2))} ${nc(fix(r.eH,2))}
+          ${nc(r.fg  != null ? fix(r.fg,3)  : null)}
+          ${nc(r.gph != null ? fix(r.gph,3) : null)}
+          ${nc(r.hpg != null ? fix(r.hpg,3) : null)}
+          ${ev}
+          <td><div class="util-cell">
+            <div class="util-bar"><div class="util-fill" style="width:${bw}px;background:${col}"></div></div>
+            <span class="util-lbl" style="color:${col}">${(r.util*100).toFixed(1)}%</span>
+          </div></td>
+        </tr>`);
     });
     document.getElementById('tbl').style.display = '';
   }
 
-  function renderSummary(rows) {
+  function summary(rows) {
     if (!rows.length) return;
-    const avgUtil = rows.reduce((s,r) => s + r.util, 0) / rows.length;
-    const gR = rows.filter(r => r.gph  != null);
-    const kR = rows.filter(r => r.kWh  != null);
+    const au = rows.reduce((s,r)=>s+r.util,0)/rows.length;
+    const gr = rows.filter(r=>r.gph!=null), kr = rows.filter(r=>r.kw!=null);
     document.getElementById('sCount').textContent = rows.length;
-    document.getElementById('sUtil').textContent  = (avgUtil * 100).toFixed(1) + '%';
-    document.getElementById('sGph').textContent   = gR.length ? (gR.reduce((s,r) => s+r.gph,0)/gR.length).toFixed(3) : '—';
-    if (kR.length) {
-      document.getElementById('sKwh').textContent  = (kR.reduce((s,r)=>s+r.kWh,0)/kR.length).toFixed(2);
-      document.getElementById('sEvWrap').style.display = '';
-    }
+    document.getElementById('sUtil').textContent  = (au*100).toFixed(1)+'%';
+    document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s,r)=>s+r.gph,0)/gr.length).toFixed(3) : '—';
+    if (kr.length) { document.getElementById('sKwh').textContent = (kr.reduce((s,r)=>s+r.kw,0)/kr.length).toFixed(2); document.getElementById('sEvWrap').style.display=''; }
     document.getElementById('summary').classList.add('show');
   }
 
-  /* ---- export ---- */
-  function exportToExcel() {
-    if (!tableData.length) return;
-    const headers = ['Device','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
-    if (hasEv) headers.push('EV Energy Used (kWh)', 'EV Energy Economy (kWh/100mi)');
-    headers.push('Utilization');
-
-    const wsData = [headers, ...tableData.map(r => {
-      const row = [
-        r.name, r.date,
-        fix(r.distMi,1), fix(r.drivH,2), fix(r.idleH,2), fix(r.engH,2),
-        r.fuelGal != null ? fix(r.fuelGal,3) : '',
-        r.gph  != null ? fix(r.gph,3)  : '',
-        r.hpg  != null ? fix(r.hpg,3)  : ''
-      ];
-      if (hasEv) row.push(r.kWh != null ? fix(r.kWh,2) : '', r.evEcon != null ? fix(r.evEcon,2) : '');
-      row.push(fix(r.util,4));
-      return row;
-    })];
-
+  function exportXls() {
+    if (!data.length) return;
+    const hdrs = ['Device','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
+    if (hasEv) hdrs.push('EV Energy Used (kWh)','EV Energy Economy (kWh/100mi)');
+    hdrs.push('Utilization');
+    const ws = XLSX.utils.aoa_to_sheet([hdrs, ...data.map(r => {
+      const row = [r.name, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
+        r.fg !=null?fix(r.fg,3):'', r.gph!=null?fix(r.gph,3):'', r.hpg!=null?fix(r.hpg,3):''];
+      if (hasEv) row.push(r.kw!=null?fix(r.kw,2):'', r.eco!=null?fix(r.eco,2):'');
+      row.push(fix(r.util,4)); return row;
+    })]);
+    const cw = [22,12,18,20,18,16,16,14,16,...(hasEv?[16,22]:[]),14];
+    ws['!cols'] = cw.map(w=>({wch:w}));
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const widths = [22,12,20,22,20,16,16,14,16,...(hasEv?[16,22]:[]),12];
-    ws['!cols'] = widths.map(w => ({ wch: w }));
     XLSX.utils.book_append_sheet(wb, ws, 'GPH & Utilization');
-    const from = document.getElementById('fromDate').value;
-    const to   = document.getElementById('toDate').value;
-    XLSX.writeFile(wb, `GPH_Utilization_${from}_to_${to}.xlsx`);
+    const f = document.getElementById('fromDate').value, t = document.getElementById('toDate').value;
+    XLSX.writeFile(wb, `GPH_Utilization_${f}_to_${t}.xlsx`);
   }
 
-  /* ---- lifecycle ---- */
   return {
-    initialize(freshApi, freshState, callback) {
-      api = freshApi; state = freshState;
-      const yd = new Date(); yd.setDate(yd.getDate() - 1);
-      const s = yd.toISOString().slice(0, 10);
+    initialize(fa, fs, cb) {
+      api = fa; state = fs;
+      const yd = new Date(); yd.setDate(yd.getDate()-1);
+      const s = yd.toISOString().slice(0,10);
       document.getElementById('fromDate').value = s;
       document.getElementById('toDate').value   = s;
-      document.getElementById('runBtn').addEventListener('click', runReport);
-      document.getElementById('exportBtn').addEventListener('click', exportToExcel);
-      callback();
+      document.getElementById('runBtn').addEventListener('click', run);
+      document.getElementById('exportBtn').addEventListener('click', exportXls);
+      cb();
     },
-    focus(freshApi, freshState) { api = freshApi; state = freshState; },
+    focus(fa, fs) { api = fa; state = fs; },
     blur() {}
   };
 };
