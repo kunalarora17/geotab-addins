@@ -202,7 +202,7 @@ geotab.addin.gphUtilization = function (api, state) {
     const to   = document.getElementById('toDate').value;
     if (!from || !to) { status('Select a date range.', true); return; }
 
-    status('Loading devices…');
+    status('Loading…');
     document.getElementById('runBtn').disabled = true;
     document.getElementById('exportBtn').disabled = true;
     document.getElementById('tbl').style.display = 'none';
@@ -213,29 +213,25 @@ geotab.addin.gphUtilization = function (api, state) {
       const nm = {};
       (devs||[]).forEach(d => { nm[d.id] = d.name || d.id; });
 
+      // Build one multiCall with a Trip + FuelAndEnergyUsed call per day.
+      // Results come back in the same order: [trips_d0, fuel_d0, trips_d1, fuel_d1, ...]
       const days = getDays(from, to);
-      const allTrips = [], allFuel = [];
-      let i = 0;
-
-      function nextDay() {
-        if (i >= days.length) {
-          process(nm, allTrips, allFuel);
-          return;
-        }
-        const day = days[i++];
+      const calls = [];
+      days.forEach(day => {
         const df = day + 'T00:00:00.000Z', dt = day + 'T23:59:59.999Z';
-        status('Loading ' + day + ' (' + i + '/' + days.length + ')…');
+        calls.push(['Get', { typeName: 'Trip',              search: { fromDate: df, toDate: dt }, resultsLimit: 50000 }]);
+        calls.push(['Get', { typeName: 'FuelAndEnergyUsed', search: { fromDate: df, toDate: dt }, resultsLimit: 50000 }]);
+      });
 
-        api.call('Get', { typeName: 'Trip', search: { fromDate: df, toDate: dt }, resultsLimit: 50000 }, function(trips) {
-          (trips || []).forEach(t => allTrips.push(t));
-          api.call('Get', { typeName: 'FuelAndEnergyUsed', search: { fromDate: df, toDate: dt }, resultsLimit: 50000 },
-            function(fuel) { (fuel || []).forEach(f => allFuel.push(f)); nextDay(); },
-            function()     { nextDay(); }
-          );
-        }, function(e) { status('Error on ' + day + ': ' + e, true); document.getElementById('runBtn').disabled = false; });
-      }
+      api.multiCall(calls, function(results) {
+        const allTrips = [], allFuel = [];
+        results.forEach((res, i) => {
+          if (i % 2 === 0) (res || []).forEach(t => allTrips.push(t));
+          else             (res || []).forEach(f => allFuel.push(f));
+        });
+        process(nm, allTrips, allFuel);
+      }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
 
-      nextDay();
     }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
