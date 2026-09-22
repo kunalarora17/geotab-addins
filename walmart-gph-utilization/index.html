@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPH &amp; Utilization Report</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f4f5f7; color: #333; font-size: 13px; }
+
+    .header { background: #00457c; color: #fff; padding: 12px 16px; }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .header p { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+
+    .controls {
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #ddd;
+      display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap;
+    }
+    .field { display: flex; flex-direction: column; gap: 3px; }
+    .field label { font-size: 10px; color: #777; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+    .field input[type="date"] { border: 1px solid #ccc; padding: 5px 8px; border-radius: 3px; font-size: 13px; }
+    .btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .btn-run { background: #00457c; color: #fff; }
+    .btn-run:hover { background: #003566; }
+    .btn-run:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-export { background: #217346; color: #fff; }
+    .btn-export:hover { background: #1a5c38; }
+    .btn-export:disabled { background: #ccc; cursor: not-allowed; }
+
+    .status-bar {
+      margin: 8px 16px; padding: 7px 10px; border-radius: 3px; font-size: 12px;
+      background: #fff3cd; border-left: 3px solid #ffc107; display: none;
+    }
+    .status-bar.error { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+    .status-bar.info { background: #d1ecf1; border-color: #17a2b8; color: #0c5460; }
+
+    .summary {
+      padding: 6px 16px; background: #fff; border-bottom: 1px solid #eee;
+      font-size: 11px; color: #555; display: none;
+    }
+    .summary span { margin-right: 20px; }
+    .summary strong { color: #333; }
+
+    .table-wrap { padding: 12px 16px; overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 12px; }
+    thead th {
+      background: #00457c; color: #fff; padding: 8px 10px;
+      text-align: left; font-weight: 500; white-space: nowrap;
+    }
+    thead th.num { text-align: right; }
+    tbody td { padding: 5px 10px; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+    tbody tr:hover td { background: #f0f5ff; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.dash { text-align: right; color: #bbb; }
+
+    .util-bar-wrap { display: inline-flex; align-items: center; gap: 6px; }
+    .util-bar-bg { width: 50px; height: 8px; background: #e9ecef; border-radius: 4px; overflow: hidden; }
+    .util-bar-fill { height: 100%; border-radius: 4px; }
+    .util-text { font-variant-numeric: tabular-nums; }
+
+    .no-data { text-align: center; padding: 40px; color: #999; font-size: 13px; display: none; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>GPH &amp; Utilization Report</h1>
+  <p>Gallons/hr &bull; Hours/gallon &bull; Asset utilization (threshold: 21.7 hrs/day)</p>
+</div>
+
+<div class="controls">
+  <div class="field">
+    <label>From Date</label>
+    <input type="date" id="fromDate">
+  </div>
+  <div class="field">
+    <label>To Date</label>
+    <input type="date" id="toDate">
+  </div>
+  <button class="btn btn-run" id="runBtn">Run Report</button>
+  <button class="btn btn-export" id="exportBtn" disabled>Export to Excel</button>
+</div>
+
+<div class="status-bar" id="statusBar"></div>
+
+<div class="summary" id="summary">
+  <span>Vehicle-days: <strong id="sumCount">—</strong></span>
+  <span>Avg utilization: <strong id="sumUtil">—</strong></span>
+  <span>Avg GPH: <strong id="sumGph">—</strong></span>
+</div>
+
+<div class="table-wrap">
+  <table id="table" style="display:none">
+    <thead>
+      <tr>
+        <th>Asset Name</th>
+        <th>Date</th>
+        <th class="num">Distance (mi)</th>
+        <th class="num">Driving (hrs)</th>
+        <th class="num">Idling (hrs)</th>
+        <th class="num">Engine ON (hrs)</th>
+        <th class="num">Fuel Used (gal)</th>
+        <th class="num">GPH</th>
+        <th class="num">HPG</th>
+        <th class="num">Utilization</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="no-data" id="noData">No data found for the selected date range.</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* global geotab, XLSX */
+geotab.addin.gphUtilization = function (api, state) {
+  const KM_TO_MI = 0.621371;
+  const L_TO_GAL = 1 / 3.78541;
+  const UTIL_THRESHOLD = 21.7;
+  let tableData = [];
+
+  // --- Helpers ---
+
+  // Parse MyGeotab TimeSpan strings: "d.hh:mm:ss" or "hh:mm:ss" → decimal hours
+  function parseTS(ts) {
+    if (!ts) return 0;
+    let s = String(ts), days = 0;
+    const dot = s.indexOf('.');
+    if (dot > 0 && dot < s.indexOf(':')) {
+      days = parseInt(s.slice(0, dot), 10);
+      s = s.slice(dot + 1);
+    }
+    const parts = s.split(':');
+    const h = parseFloat(parts[0]) || 0;
+    const m = parseFloat(parts[1]) || 0;
+    const sec = parseFloat(parts[2]) || 0;
+    return days * 24 + h + m / 60 + sec / 3600;
+  }
+
+  function dateKey(dt) {
+    return String(dt).substring(0, 10); // "YYYY-MM-DD"
+  }
+
+  function fmt(n, decimals) {
+    return (n == null || isNaN(n)) ? null : +n.toFixed(decimals);
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('statusBar');
+    if (!msg) { el.style.display = 'none'; return; }
+    el.textContent = msg;
+    el.className = 'status-bar' + (type ? ' ' + type : '');
+    el.style.display = 'block';
+  }
+
+  // --- Report Logic ---
+
+  function runReport() {
+    const fromVal = document.getElementById('fromDate').value;
+    const toVal = document.getElementById('toDate').value;
+    if (!fromVal || !toVal) { setStatus('Please select a date range.', 'error'); return; }
+
+    const fromISO = fromVal + 'T00:00:00.000Z';
+    const toISO   = toVal   + 'T23:59:59.999Z';
+
+    setStatus('Fetching trip data…', null);
+    document.getElementById('runBtn').disabled = true;
+    document.getElementById('exportBtn').disabled = true;
+    document.getElementById('table').style.display = 'none';
+    document.getElementById('noData').style.display = 'none';
+    document.getElementById('summary').style.display = 'none';
+
+    const tripSearch = { typeName: 'Trip', search: { fromDate: fromISO, toDate: toISO }, resultsLimit: 50000 };
+    const fuelSearch = { typeName: 'FuelUsed', search: { fromDate: fromISO, toDate: toISO }, resultsLimit: 50000 };
+
+    api.call('Get', tripSearch, function (trips) {
+      setStatus('Fetching fuel data…', null);
+      api.call('Get', fuelSearch, function (fuelRecords) {
+        processData(trips || [], fuelRecords || []);
+      }, function () {
+        // FuelUsed unavailable — render trips without fuel columns
+        processData(trips || [], []);
+      });
+    }, function (err) {
+      setStatus('Error fetching trips: ' + err, 'error');
+      document.getElementById('runBtn').disabled = false;
+    });
+  }
+
+  function processData(trips, fuelRecords) {
+    // Aggregate trips by device + day
+    const tripMap = {};
+    for (const t of trips) {
+      const key = t.device.id + '|' + dateKey(t.start);
+      if (!tripMap[key]) {
+        tripMap[key] = {
+          deviceId: t.device.id,
+          name: t.device.name || t.device.id,
+          date: dateKey(t.start),
+          distKm: 0, drivHrs: 0, idleHrs: 0
+        };
+      }
+      const r = tripMap[key];
+      r.distKm  += (t.distance || 0);
+      r.drivHrs += parseTS(t.drivingDuration);
+      r.idleHrs += parseTS(t.idlingDuration);
+    }
+
+    // Aggregate fuel by device + day
+    const fuelMap = {};
+    for (const f of fuelRecords) {
+      const key = f.device.id + '|' + dateKey(f.dateTime);
+      fuelMap[key] = (fuelMap[key] || 0) + (f.totalFuelUsed || 0);
+    }
+
+    // Build rows
+    tableData = Object.entries(tripMap).map(([key, t]) => {
+      const fuelGal    = (fuelMap[key] || 0) * L_TO_GAL;
+      const engineHrs  = t.drivHrs + t.idleHrs;
+      const gph        = (engineHrs > 0 && fuelGal > 0) ? fuelGal / engineHrs : null;
+      const hpg        = (fuelGal > 0 && engineHrs > 0) ? engineHrs / fuelGal : null;
+      const util       = t.drivHrs / UTIL_THRESHOLD;
+      return {
+        assetName: t.name,
+        date:      t.date,
+        distMi:    t.distKm * KM_TO_MI,
+        drivHrs:   t.drivHrs,
+        idleHrs:   t.idleHrs,
+        engineHrs,
+        fuelGal:   fuelGal > 0 ? fuelGal : null,
+        gph, hpg, util
+      };
+    }).sort((a, b) => a.assetName.localeCompare(b.assetName) || a.date.localeCompare(b.date));
+
+    renderTable(tableData);
+    renderSummary(tableData);
+    setStatus(null);
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('exportBtn').disabled = tableData.length === 0;
+  }
+
+  function utilColor(util) {
+    if (util >= 1.0) return '#28a745';
+    if (util >= 0.7) return '#ffc107';
+    return '#dc3545';
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+
+    if (!rows.length) {
+      document.getElementById('noData').style.display = 'block';
+      return;
+    }
+
+    rows.forEach(r => {
+      const utilPct  = (r.util * 100).toFixed(1) + '%';
+      const barWidth = Math.min(r.util, 1) * 50;
+      const color    = utilColor(r.util);
+
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td>${r.assetName}</td>` +
+        `<td>${r.date}</td>` +
+        numCell(fmt(r.distMi, 1)) +
+        numCell(fmt(r.drivHrs, 2)) +
+        numCell(fmt(r.idleHrs, 2)) +
+        numCell(fmt(r.engineHrs, 2)) +
+        numCell(r.fuelGal != null ? fmt(r.fuelGal, 3) : null) +
+        numCell(r.gph != null ? fmt(r.gph, 3) : null) +
+        numCell(r.hpg != null ? fmt(r.hpg, 3) : null) +
+        `<td class="num">
+          <div class="util-bar-wrap">
+            <div class="util-bar-bg"><div class="util-bar-fill" style="width:${barWidth}px;background:${color}"></div></div>
+            <span class="util-text" style="color:${color}">${utilPct}</span>
+          </div>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('table').style.display = '';
+  }
+
+  function numCell(val) {
+    return val != null
+      ? `<td class="num">${val}</td>`
+      : `<td class="dash">—</td>`;
+  }
+
+  function renderSummary(rows) {
+    if (!rows.length) return;
+    const avgUtil = rows.reduce((s, r) => s + r.util, 0) / rows.length;
+    const gphRows = rows.filter(r => r.gph != null);
+    const avgGph  = gphRows.length ? gphRows.reduce((s, r) => s + r.gph, 0) / gphRows.length : null;
+
+    document.getElementById('sumCount').textContent = rows.length;
+    document.getElementById('sumUtil').textContent  = (avgUtil * 100).toFixed(1) + '%';
+    document.getElementById('sumGph').textContent   = avgGph != null ? avgGph.toFixed(3) : '—';
+    document.getElementById('summary').style.display = 'block';
+  }
+
+  // --- Excel Export ---
+
+  function exportToExcel() {
+    if (!tableData.length) return;
+
+    const headers = ['Asset Name', 'Date', 'Distance (mi)', 'Driving (hrs)', 'Idling (hrs)', 'Engine ON (hrs)', 'Fuel Used (gal)', 'GPH', 'HPG', 'Utilization'];
+    const wsData = [
+      headers,
+      ...tableData.map(r => [
+        r.assetName,
+        r.date,
+        fmt(r.distMi, 1),
+        fmt(r.drivHrs, 2),
+        fmt(r.idleHrs, 2),
+        fmt(r.engineHrs, 2),
+        r.fuelGal != null ? fmt(r.fuelGal, 3) : '',
+        r.gph != null ? fmt(r.gph, 3) : '',
+        r.hpg != null ? fmt(r.hpg, 3) : '',
+        +r.util.toFixed(4)
+      ])
+    ];
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [22, 12, 14, 14, 14, 16, 16, 8, 8, 12].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ws, 'GPH & Utilization');
+
+    const from = document.getElementById('fromDate').value;
+    const to   = document.getElementById('toDate').value;
+    XLSX.writeFile(wb, `GPH_Utilization_${from}_to_${to}.xlsx`);
+  }
+
+  // --- Add-In Lifecycle ---
+
+  return {
+    initialize: function (freshApi, freshState, callback) {
+      api   = freshApi;
+      state = freshState;
+
+      // Default: yesterday
+      const yd = new Date();
+      yd.setDate(yd.getDate() - 1);
+      const ydStr = yd.toISOString().split('T')[0];
+      document.getElementById('fromDate').value = ydStr;
+      document.getElementById('toDate').value   = ydStr;
+
+      document.getElementById('runBtn').addEventListener('click', runReport);
+      document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+
+      callback();
+    },
+    focus: function (freshApi, freshState) {
+      api   = freshApi;
+      state = freshState;
+    },
+    blur: function () {}
+  };
+};
+</script>
+</body>
+</html>

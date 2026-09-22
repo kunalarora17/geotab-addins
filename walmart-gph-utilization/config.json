@@ -1,0 +1,13 @@
+{
+  "name": "GPH & Utilization Report",
+  "supportEmail": "kunalarora@geotab.com",
+  "items": [
+    {
+      "page": "customReports",
+      "menuName": {
+        "en": "GPH & Utilization"
+      },
+      "url": "https://kunalarora17.github.io/geotab-addins/walmart-gph-utilization/"
+    }
+  ]
+}

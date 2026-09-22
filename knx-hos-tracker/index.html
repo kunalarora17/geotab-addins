@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HOS Hours Remaining</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f4f5f7; color: #333; font-size: 13px; }
+
+    .header { background: #00457c; color: #fff; padding: 12px 16px; }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .header p { font-size: 11px; opacity: 0.75; margin-top: 2px; }
+
+    .search-bar {
+      padding: 10px 16px; background: #fff; border-bottom: 1px solid #ddd;
+      display: flex; gap: 8px; align-items: center;
+    }
+    .search-bar input {
+      flex: 1; max-width: 360px; border: 1px solid #ccc; padding: 6px 10px;
+      border-radius: 3px; font-size: 13px;
+    }
+    .search-bar input:focus { outline: none; border-color: #00457c; }
+    .btn { padding: 6px 14px; border: none; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .btn-search { background: #00457c; color: #fff; }
+    .btn-search:hover { background: #003566; }
+    .btn-search:disabled { background: #aaa; cursor: not-allowed; }
+
+    .status-bar {
+      margin: 8px 16px; padding: 7px 10px; border-radius: 3px; font-size: 12px;
+      background: #fff3cd; border-left: 3px solid #ffc107; display: none;
+    }
+    .status-bar.error { background: #f8d7da; border-color: #dc3545; color: #721c24; }
+
+    /* Driver picker */
+    .driver-list { margin: 8px 16px; background: #fff; border: 1px solid #ddd; border-radius: 3px; display: none; max-height: 200px; overflow-y: auto; }
+    .driver-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+    .driver-item:last-child { border-bottom: none; }
+    .driver-item:hover { background: #f0f5ff; }
+    .driver-item .driver-code { color: #888; font-size: 11px; margin-left: 6px; }
+
+    /* HOS Panel */
+    .hos-panel { padding: 12px 16px; display: none; }
+
+    .driver-header { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #00457c; }
+    .driver-header span { font-size: 11px; color: #888; font-weight: 400; margin-left: 6px; }
+
+    .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+    .card {
+      background: #fff; border-radius: 4px; padding: 12px 16px; flex: 1; min-width: 140px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); border-top: 3px solid #00457c;
+    }
+    .card.warn { border-color: #ffc107; }
+    .card.danger { border-color: #dc3545; }
+    .card-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.4px; color: #777; font-weight: 700; margin-bottom: 4px; }
+    .card-value { font-size: 24px; font-weight: 700; color: #00457c; font-variant-numeric: tabular-nums; }
+    .card.warn .card-value { color: #856404; }
+    .card.danger .card-value { color: #721c24; }
+    .card-sub { font-size: 10px; color: #aaa; margin-top: 2px; }
+
+    /* Progress bar inside cycle card */
+    .cycle-bar-bg { height: 6px; background: #e9ecef; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .cycle-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+
+    /* Recap table */
+    .recap-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: #555; margin-bottom: 6px; }
+    table { width: 100%; max-width: 500px; border-collapse: collapse; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.08); font-size: 12px; }
+    thead th { background: #00457c; color: #fff; padding: 7px 10px; text-align: left; font-weight: 500; }
+    thead th.num { text-align: right; }
+    tbody td { padding: 5px 10px; border-bottom: 1px solid #f0f0f0; }
+    tbody tr:last-child td { border-bottom: none; font-weight: 600; background: #f8f9ff; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .bar-cell { width: 80px; }
+    .mini-bar-bg { height: 6px; background: #e9ecef; border-radius: 3px; overflow: hidden; }
+    .mini-bar-fill { height: 100%; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>HOS Hours Remaining</h1>
+  <p>70-hour / 8-day ruleset</p>
+</div>
+
+<div class="search-bar">
+  <input type="text" id="searchInput" placeholder="Search driver by name or employee number…">
+  <button class="btn btn-search" id="searchBtn">Search</button>
+</div>
+
+<div class="status-bar" id="statusBar"></div>
+<div class="driver-list" id="driverList"></div>
+
+<div class="hos-panel" id="hosPanel">
+  <div class="driver-header" id="driverHeader"></div>
+
+  <div class="cards">
+    <div class="card" id="cycleCard">
+      <div class="card-label">Cycle Hours Remaining</div>
+      <div class="card-value" id="cycleVal">—</div>
+      <div class="card-sub">of 70 hrs (8-day rolling)</div>
+      <div class="cycle-bar-bg"><div class="cycle-bar-fill" id="cycleBar"></div></div>
+    </div>
+    <div class="card" id="drivingCard">
+      <div class="card-label">Driving Left Today</div>
+      <div class="card-value" id="drivingVal">—</div>
+      <div class="card-sub">11-hr driving limit</div>
+    </div>
+    <div class="card" id="dutyCard">
+      <div class="card-label">On-Duty Left Today</div>
+      <div class="card-value" id="dutyVal">—</div>
+      <div class="card-sub">14-hr on-duty window</div>
+    </div>
+  </div>
+
+  <div class="recap-title">8-Day On-Duty Recap</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Day</th>
+        <th class="num">On-Duty (hrs)</th>
+        <th class="bar-cell"></th>
+      </tr>
+    </thead>
+    <tbody id="recapBody"></tbody>
+  </table>
+</div>
+
+<script>
+/* global geotab */
+geotab.addin.hosTracker = function (api, state) {
+
+  // Parse TimeSpan "d.hh:mm:ss" or "hh:mm:ss" → decimal hours
+  function parseTS(ts) {
+    if (!ts) return 0;
+    let s = String(ts), days = 0;
+    const dot = s.indexOf('.');
+    if (dot > 0 && dot < s.indexOf(':')) {
+      days = parseInt(s.slice(0, dot), 10);
+      s = s.slice(dot + 1);
+    }
+    const parts = s.split(':');
+    return days * 24 + (parseFloat(parts[0]) || 0) + (parseFloat(parts[1]) || 0) / 60 + (parseFloat(parts[2]) || 0) / 3600;
+  }
+
+  function fmtHrs(decimalHours) {
+    if (decimalHours == null || isNaN(decimalHours)) return '—';
+    const h = Math.floor(decimalHours);
+    const m = Math.round((decimalHours - h) * 60);
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+
+  function setStatus(msg, type) {
+    const el = document.getElementById('statusBar');
+    if (!msg) { el.style.display = 'none'; return; }
+    el.textContent = msg;
+    el.className = 'status-bar' + (type ? ' ' + type : '');
+    el.style.display = 'block';
+  }
+
+  function thresholdClass(hrs, warn, danger) {
+    if (hrs <= danger) return 'danger';
+    if (hrs <= warn)   return 'warn';
+    return '';
+  }
+
+  // --- Driver Search ---
+
+  function searchDrivers() {
+    const q = document.getElementById('searchInput').value.trim();
+    if (!q) return;
+
+    setStatus('Searching…', null);
+    document.getElementById('searchBtn').disabled = true;
+    document.getElementById('driverList').style.display = 'none';
+    document.getElementById('hosPanel').style.display = 'none';
+
+    api.call('Get', {
+      typeName: 'User',
+      search: { name: q },
+      resultsLimit: 25
+    }, function (users) {
+      setStatus(null);
+      document.getElementById('searchBtn').disabled = false;
+
+      if (!users || users.length === 0) {
+        setStatus('No drivers found for "' + q + '"', 'error');
+        return;
+      }
+
+      renderDriverList(users);
+    }, function (err) {
+      setStatus('Search error: ' + err, 'error');
+      document.getElementById('searchBtn').disabled = false;
+    });
+  }
+
+  function renderDriverList(users) {
+    const list = document.getElementById('driverList');
+    list.innerHTML = '';
+
+    users.forEach(u => {
+      const div = document.createElement('div');
+      div.className = 'driver-item';
+      const name = [u.firstName, u.lastName].filter(Boolean).join(' ') || u.name || u.id;
+      const code = u.employeeNumber || u.name || '';
+      div.innerHTML = `<strong>${name}</strong><span class="driver-code">${code !== name ? code : ''}</span>`;
+      div.addEventListener('click', () => loadHos(u));
+      list.appendChild(div);
+    });
+
+    list.style.display = 'block';
+  }
+
+  // --- Load HOS Data ---
+
+  function loadHos(user) {
+    document.getElementById('driverList').style.display = 'none';
+    document.getElementById('hosPanel').style.display = 'none';
+    setStatus('Loading HOS data…', null);
+
+    const name = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.name || user.id;
+
+    api.call('Get', {
+      typeName: 'DutyStatusAvailability',
+      search: { userSearch: { id: user.id } },
+      resultsLimit: 1
+    }, function (results) {
+      setStatus(null);
+      if (!results || results.length === 0) {
+        setStatus('No HOS data found for ' + name + '. Driver may not have HOS enabled.', 'error');
+        return;
+      }
+      renderHos(name, results[0]);
+    }, function (err) {
+      setStatus('Error fetching HOS data: ' + err, 'error');
+    });
+  }
+
+  // --- Render HOS Panel ---
+
+  function renderHos(name, avail) {
+    const cycleHrs   = parseTS(avail.cycle);
+    const drivingHrs = parseTS(avail.driving);
+    const dutyHrs    = parseTS(avail.duty);
+
+    // Driver header
+    document.getElementById('driverHeader').innerHTML =
+      name + '<span>Current availability as of now</span>';
+
+    // Cycle card
+    const cycleCard = document.getElementById('cycleCard');
+    const cls = thresholdClass(cycleHrs, 14, 4);
+    cycleCard.className = 'card' + (cls ? ' ' + cls : '');
+    document.getElementById('cycleVal').textContent = fmtHrs(cycleHrs);
+    const pct = Math.min(cycleHrs / 70, 1) * 100;
+    const barColor = cls === 'danger' ? '#dc3545' : cls === 'warn' ? '#ffc107' : '#00457c';
+    document.getElementById('cycleBar').style.cssText = `width:${pct}%;background:${barColor}`;
+
+    // Driving card
+    const drivCard = document.getElementById('drivingCard');
+    const drivCls  = thresholdClass(drivingHrs, 3, 1);
+    drivCard.className = 'card' + (drivCls ? ' ' + drivCls : '');
+    document.getElementById('drivingVal').textContent = fmtHrs(drivingHrs);
+
+    // Duty card
+    const dutyCard = document.getElementById('dutyCard');
+    const dutyCls  = thresholdClass(dutyHrs, 3, 1);
+    dutyCard.className = 'card' + (dutyCls ? ' ' + dutyCls : '');
+    document.getElementById('dutyVal').textContent = fmtHrs(dutyHrs);
+
+    // Recap table
+    renderRecap(avail.recap || []);
+
+    document.getElementById('hosPanel').style.display = 'block';
+  }
+
+  function renderRecap(recap) {
+    const tbody = document.getElementById('recapBody');
+    tbody.innerHTML = '';
+
+    // recap is an array of DutyStatusRecap — each has a date and onDuty duration
+    // Most recent day is last in array
+    const days = recap.slice().reverse().slice(0, 8); // last 8 days, most recent first
+    const maxHrs = Math.max(...days.map(d => parseTS(d.onDuty || d.duration || 0)), 1);
+    let total = 0;
+
+    days.forEach((d, i) => {
+      const hrs = parseTS(d.onDuty || d.duration || 0);
+      total += hrs;
+      const dateStr = d.dateTime ? String(d.dateTime).substring(0, 10) : ('Day ' + (i + 1));
+      const label   = i === 0 ? dateStr + ' (today)' : dateStr;
+      const barPct  = (hrs / Math.max(maxHrs, 1)) * 100;
+      const barColor = hrs > 11 ? '#dc3545' : hrs > 8 ? '#ffc107' : '#00457c';
+
+      tbody.innerHTML +=
+        `<tr>
+          <td>${label}</td>
+          <td class="num">${fmtHrs(hrs)}</td>
+          <td class="bar-cell">
+            <div class="mini-bar-bg">
+              <div class="mini-bar-fill" style="width:${barPct}%;background:${barColor}"></div>
+            </div>
+          </td>
+        </tr>`;
+    });
+
+    // Totals row
+    const remaining = Math.max(70 - total, 0);
+    tbody.innerHTML +=
+      `<tr>
+        <td>8-Day Total Used</td>
+        <td class="num">${fmtHrs(total)} / 70h</td>
+        <td class="bar-cell" style="font-size:11px;color:#555">${fmtHrs(remaining)} left</td>
+      </tr>`;
+  }
+
+  // --- Lifecycle ---
+
+  return {
+    initialize: function (freshApi, freshState, callback) {
+      api   = freshApi;
+      state = freshState;
+
+      const searchBtn   = document.getElementById('searchBtn');
+      const searchInput = document.getElementById('searchInput');
+
+      searchBtn.addEventListener('click', searchDrivers);
+      searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchDrivers(); });
+
+      callback();
+    },
+    focus: function (freshApi, freshState) {
+      api   = freshApi;
+      state = freshState;
+    },
+    blur: function () {}
+  };
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "HOS Hours Remaining",
+  "supportEmail": "kunalarora@geotab.com",
+  "items": [
+    {
+      "page": "customReports",
+      "menuName": {
+        "en": "HOS Hours Remaining"
+      },
+      "url": "https://kunalarora17.github.io/geotab-addins/knx-hos-tracker/"
+    }
+  ]
+}
