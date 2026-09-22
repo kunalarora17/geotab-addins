@@ -17,21 +17,47 @@
     .ctrl { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #718096; }
-    .field input[type=date],
-    .field select {
+    .field input[type=date] {
       border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 9px;
-      font-size: 12px; color: #2d3748; background: #fff; outline: none;
+      font-size: 12px; color: #2d3748; background: #fff; outline: none; width: 140px;
     }
-    .field input[type=date] { width: 140px; }
-    .field select { min-width: 180px; height: 30px; cursor: pointer; }
-    .field input[type=date]:focus,
-    .field select:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
+    .field input[type=date]:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
     .btn { height: 30px; padding: 0 14px; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; letter-spacing: .2px; }
-    .btn-run     { background: #1a56a0; color: #fff; }
-    .btn-run:hover     { background: #154480; }
-    .btn-export  { background: #276749; color: #fff; }
-    .btn-export:hover  { background: #1f5238; }
+    .btn-run    { background: #1a56a0; color: #fff; }
+    .btn-run:hover    { background: #154480; }
+    .btn-export { background: #276749; color: #fff; }
+    .btn-export:hover { background: #1f5238; }
     .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    /* Searchable group dropdown */
+    .grp-wrap { position: relative; width: 200px; }
+    .grp-input {
+      width: 100%; border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 28px 5px 9px;
+      font-size: 12px; color: #2d3748; background: #fff; outline: none; height: 30px;
+    }
+    .grp-input:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
+    .grp-input.has-value { font-weight: 600; }
+    .grp-clear {
+      position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+      font-size: 14px; color: #a0aec0; cursor: pointer; display: none; line-height: 1;
+      background: none; border: none; padding: 0;
+    }
+    .grp-clear:hover { color: #e53e3e; }
+    .grp-drop {
+      position: absolute; top: calc(100% + 2px); left: 0; right: 0;
+      background: #fff; border: 1px solid #cbd5e0; border-radius: 5px;
+      max-height: 220px; overflow-y: auto; z-index: 1000;
+      box-shadow: 0 4px 12px rgba(0,0,0,.12); display: none;
+    }
+    .grp-drop.open { display: block; }
+    .grp-opt {
+      padding: 7px 10px; font-size: 12px; cursor: pointer; color: #2d3748;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .grp-opt:hover   { background: #ebf4ff; }
+    .grp-opt.active  { background: #e8f0fe; font-weight: 600; color: #1a56a0; }
+    .grp-opt.no-match { color: #a0aec0; cursor: default; font-style: italic; }
+    .grp-opt.no-match:hover { background: none; }
 
     /* Status */
     .status { margin: 8px 16px 0; padding: 7px 12px; border-radius: 5px; font-size: 12px; display: none; background: #fefcbf; border-left: 3px solid #d69e2e; }
@@ -119,7 +145,11 @@
   <div class="field"><label>To Date</label><input type="date" id="toDate"></div>
   <div class="field">
     <label>Group</label>
-    <select id="groupFilter"><option value="">All Groups</option></select>
+    <div class="grp-wrap" id="grpWrap">
+      <input type="text" class="grp-input" id="grpInput" placeholder="All Groups" autocomplete="off">
+      <button class="grp-clear" id="grpClear" title="Clear">&times;</button>
+      <div class="grp-drop" id="grpDrop"></div>
+    </div>
   </div>
   <button class="btn btn-run"    id="runBtn"    style="margin-bottom:0">Run Report</button>
   <button class="btn btn-export" id="exportBtn" style="margin-bottom:0" disabled>Export to Excel</button>
@@ -178,7 +208,7 @@
 /* global geotab, XLSX */
 geotab.addin.gphUtilization = function (api, state) {
   const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, THRESH = 21.7;
-  let data = [], hasEv = false, gm = {};
+  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupId = '';
 
   function pts(ts) {
     if (!ts) return 0;
@@ -207,6 +237,82 @@ geotab.addin.gphUtilization = function (api, state) {
     return days;
   }
 
+  // --- Searchable group dropdown ---
+
+  function buildDropdown(q) {
+    const drop = document.getElementById('grpDrop');
+    drop.innerHTML = '';
+    const query = (q || '').toLowerCase().trim();
+
+    // "All Groups" option
+    const all = document.createElement('div');
+    all.className = 'grp-opt' + (selectedGroupId === '' ? ' active' : '');
+    all.textContent = 'All Groups';
+    all.addEventListener('mousedown', function(e) { e.preventDefault(); selectGroup('', ''); });
+    drop.appendChild(all);
+
+    const matches = query ? groupList.filter(g => g.name.toLowerCase().includes(query)) : groupList;
+    if (!matches.length && query) {
+      const nm = document.createElement('div');
+      nm.className = 'grp-opt no-match';
+      nm.textContent = 'No groups match "' + q + '"';
+      drop.appendChild(nm);
+    } else {
+      matches.forEach(g => {
+        const opt = document.createElement('div');
+        opt.className = 'grp-opt' + (selectedGroupId === g.id ? ' active' : '');
+        opt.textContent = g.name;
+        opt.addEventListener('mousedown', function(e) { e.preventDefault(); selectGroup(g.id, g.name); });
+        drop.appendChild(opt);
+      });
+    }
+  }
+
+  function selectGroup(id, name) {
+    selectedGroupId = id;
+    const inp = document.getElementById('grpInput');
+    inp.value = name;
+    inp.placeholder = name || 'All Groups';
+    inp.className = 'grp-input' + (name ? ' has-value' : '');
+    document.getElementById('grpClear').style.display = name ? 'block' : 'none';
+    document.getElementById('grpDrop').classList.remove('open');
+    inp.blur();
+  }
+
+  function initGroupDropdown() {
+    const inp   = document.getElementById('grpInput');
+    const drop  = document.getElementById('grpDrop');
+    const clear = document.getElementById('grpClear');
+
+    inp.addEventListener('focus', function() {
+      buildDropdown(inp.value);
+      drop.classList.add('open');
+    });
+    inp.addEventListener('input', function() {
+      buildDropdown(inp.value);
+      drop.classList.add('open');
+    });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { drop.classList.remove('open'); inp.blur(); }
+    });
+    clear.addEventListener('click', function() { selectGroup('', ''); });
+
+    document.addEventListener('click', function(e) {
+      if (!document.getElementById('grpWrap').contains(e.target)) {
+        drop.classList.remove('open');
+        // if input text doesn't match selection, reset to selected name
+        if (selectedGroupId) {
+          const match = groupList.find(g => g.id === selectedGroupId);
+          inp.value = match ? match.name : '';
+        } else {
+          inp.value = '';
+        }
+      }
+    });
+  }
+
+  // --- Run ---
+
   function run() {
     const from = document.getElementById('fromDate').value;
     const to   = document.getElementById('toDate').value;
@@ -219,8 +325,7 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('noData').style.display = 'none';
     document.getElementById('summary').classList.remove('show');
 
-    const selectedGroup = document.getElementById('groupFilter').value;
-    const deviceSearch  = selectedGroup ? { groups: [{ id: selectedGroup }] } : {};
+    const deviceSearch = selectedGroupId ? { groups: [{ id: selectedGroupId }] } : {};
 
     api.call('Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }, function(devs) {
       const nm = {}, devGroups = {};
@@ -229,7 +334,6 @@ geotab.addin.gphUtilization = function (api, state) {
         devGroups[d.id] = (d.groups || []).map(g => gm[g.id]).filter(Boolean).join(', ');
       });
 
-      // One multiCall: Trip + FuelAndEnergyUsed per day, all in parallel
       const days = getDays(from, to);
       const calls = [];
       days.forEach(day => {
@@ -275,8 +379,8 @@ geotab.addin.gphUtilization = function (api, state) {
         name: nm[t.id] || t.id, group: devGroups[t.id] || '', date: t.date,
         mi, dH: t.dH, iH: t.iH, eH,
         fg:  fg > 0 ? fg : null,
-        gph: (eH > 0 && fg > 0) ? fg / eH   : null,
-        hpg: (fg > 0 && eH > 0) ? eH / fg   : null,
+        gph: (eH > 0 && fg > 0) ? fg / eH    : null,
+        hpg: (fg > 0 && eH > 0) ? eH / fg    : null,
         kw:  kw > 0 ? kw : null,
         eco: (kw > 0 && t.dH > 0) ? kw / t.dH : null,
         util: t.dH / THRESH
@@ -363,18 +467,14 @@ geotab.addin.gphUtilization = function (api, state) {
       document.getElementById('runBtn').addEventListener('click', run);
       document.getElementById('exportBtn').addEventListener('click', exportXls);
 
-      // Load groups once on init so the dropdown is ready immediately
+      initGroupDropdown();
+
+      // Load groups once so dropdown is ready before first Run
       api.call('Get', { typeName: 'Group', search: {}, resultsLimit: 10000 }, function(grps) {
-        const sel = document.getElementById('groupFilter');
         (grps || []).forEach(g => { if (g.id && g.name) gm[g.id] = g.name; });
-        (grps || [])
-          .filter(g => g.name && !g.id.startsWith('Group'))  // exclude system groups
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .forEach(g => {
-            const opt = document.createElement('option');
-            opt.value = g.id; opt.textContent = g.name;
-            sel.appendChild(opt);
-          });
+        groupList = (grps || [])
+          .filter(g => g.name && !g.id.startsWith('Group'))
+          .sort((a, b) => a.name.localeCompare(b.name));
       });
 
       cb();
