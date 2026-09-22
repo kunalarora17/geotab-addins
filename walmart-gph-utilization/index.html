@@ -17,8 +17,15 @@
     .ctrl { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #718096; }
-    .field input[type=date] { border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 9px; font-size: 12px; color: #2d3748; background: #fff; outline: none; width: 140px; }
-    .field input[type=date]:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
+    .field input[type=date],
+    .field select {
+      border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 9px;
+      font-size: 12px; color: #2d3748; background: #fff; outline: none;
+    }
+    .field input[type=date] { width: 140px; }
+    .field select { min-width: 180px; height: 30px; cursor: pointer; }
+    .field input[type=date]:focus,
+    .field select:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
     .btn { height: 30px; padding: 0 14px; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; letter-spacing: .2px; }
     .btn-run     { background: #1a56a0; color: #fff; }
     .btn-run:hover     { background: #154480; }
@@ -48,7 +55,7 @@
 
     /* Column widths */
     col.c-name  { width: 130px; }
-    col.c-group { width: 120px; }
+    col.c-group { width: 130px; }
     col.c-date  { width: 100px; }
     col.c-num   { width: 105px; }
     col.c-util  { width: 130px; }
@@ -64,9 +71,6 @@
       vertical-align: middle !important;
       cursor: help;
     }
-    #tbl thead th:first-child,
-    #tbl thead th:nth-child(2),
-    #tbl thead th:nth-child(3) { text-align: left !important; }
     #tbl thead th:last-child { border-right: none !important; }
 
     /* Header section colours */
@@ -93,9 +97,6 @@
       color: #2d3748 !important;
       font-size: 12px !important;
     }
-    #tbl tbody td:first-child,
-    #tbl tbody td:nth-child(2),
-    #tbl tbody td:nth-child(3) { text-align: left !important; }
     #tbl tbody td:last-child { border-right: none !important; }
     #tbl tbody td.na { color: #cbd5e0 !important; text-align: center !important; }
 
@@ -103,7 +104,7 @@
     .util-cell { display: flex !important; align-items: center !important; gap: 6px !important; justify-content: center !important; }
     .util-bar  { flex-shrink: 0; width: 46px; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .util-fill { height: 100%; border-radius: 4px; }
-    .util-lbl  { font-weight: 700; font-size: 12px; min-width: 40px; text-align: right; }
+    .util-lbl  { font-weight: 700; font-size: 12px; min-width: 40px; text-align: center; }
   </style>
 </head>
 <body>
@@ -116,6 +117,10 @@
 <div class="ctrl">
   <div class="field"><label>From Date</label><input type="date" id="fromDate"></div>
   <div class="field"><label>To Date</label><input type="date" id="toDate"></div>
+  <div class="field">
+    <label>Group</label>
+    <select id="groupFilter"><option value="">All Groups</option></select>
+  </div>
   <button class="btn btn-run"    id="runBtn"    style="margin-bottom:0">Run Report</button>
   <button class="btn btn-export" id="exportBtn" style="margin-bottom:0" disabled>Export to Excel</button>
 </div>
@@ -173,7 +178,7 @@
 /* global geotab, XLSX */
 geotab.addin.gphUtilization = function (api, state) {
   const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, THRESH = 21.7;
-  let data = [], hasEv = false;
+  let data = [], hasEv = false, gm = {};
 
   function pts(ts) {
     if (!ts) return 0;
@@ -214,27 +219,17 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('noData').style.display = 'none';
     document.getElementById('summary').classList.remove('show');
 
-    // Read the org filter from the top-left selector; filter out the root group (= no filter)
-    const groupFilter = (state && state.getGroupFilter ? state.getGroupFilter() : [])
-      .filter(g => g.id !== 'GroupCompanyId');
-    const deviceSearch = groupFilter.length ? { groups: groupFilter } : {};
+    const selectedGroup = document.getElementById('groupFilter').value;
+    const deviceSearch  = selectedGroup ? { groups: [{ id: selectedGroup }] } : {};
 
-    // Fetch devices (scoped to org filter) and all groups in one shot
-    api.multiCall([
-      ['Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }],
-      ['Get', { typeName: 'Group',  search: {},           resultsLimit: 10000 }]
-    ], function(initRes) {
-      const devs = initRes[0] || [], grps = initRes[1] || [];
-
-      const nm = {}, gm = {}, devGroups = {};
-      grps.forEach(g => { gm[g.id] = g.name || ''; });
-      devs.forEach(d => {
+    api.call('Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }, function(devs) {
+      const nm = {}, devGroups = {};
+      (devs || []).forEach(d => {
         nm[d.id] = d.name || d.id;
         devGroups[d.id] = (d.groups || []).map(g => gm[g.id]).filter(Boolean).join(', ');
       });
 
-      // Build one multiCall with a Trip + FuelAndEnergyUsed call per day.
-      // Results come back in the same order: [trips_d0, fuel_d0, trips_d1, fuel_d1, ...]
+      // One multiCall: Trip + FuelAndEnergyUsed per day, all in parallel
       const days = getDays(from, to);
       const calls = [];
       days.forEach(day => {
@@ -267,8 +262,8 @@ geotab.addin.gphUtilization = function (api, state) {
     for (const f of fuel) {
       const k = f.device.id + '|' + dk(f.dateTime);
       if (!fm[k]) fm[k] = { fL: 0, kWh: 0 };
-      fm[k].fL  += f.totalFuelUsed      || 0;
-      fm[k].kWh += f.totalEnergyUsedKwh  || 0;
+      fm[k].fL  += f.totalFuelUsed     || 0;
+      fm[k].kWh += f.totalEnergyUsedKwh || 0;
     }
     hasEv = false;
     data = Object.entries(tm).map(([k, t]) => {
@@ -279,11 +274,11 @@ geotab.addin.gphUtilization = function (api, state) {
       return {
         name: nm[t.id] || t.id, group: devGroups[t.id] || '', date: t.date,
         mi, dH: t.dH, iH: t.iH, eH,
-        fg: fg > 0 ? fg : null,
-        gph:  (eH > 0 && fg > 0) ? fg / eH  : null,
-        hpg:  (fg > 0 && eH > 0) ? eH / fg  : null,
-        kw:   kw > 0 ? kw : null,
-        eco:  (kw > 0 && t.dH > 0) ? kw / t.dH : null,
+        fg:  fg > 0 ? fg : null,
+        gph: (eH > 0 && fg > 0) ? fg / eH   : null,
+        hpg: (fg > 0 && eH > 0) ? eH / fg   : null,
+        kw:  kw > 0 ? kw : null,
+        eco: (kw > 0 && t.dH > 0) ? kw / t.dH : null,
         util: t.dH / THRESH
       };
     }).sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
@@ -305,12 +300,12 @@ geotab.addin.gphUtilization = function (api, state) {
     if (!rows.length) { document.getElementById('noData').style.display = 'block'; return; }
     rows.forEach(r => {
       const col = uc(r.util), bw = Math.min(r.util, 1) * 46;
-      const ev  = hasEv ? nc(r.kw  != null ? fix(r.kw, 2)  : null) + nc(r.eco != null ? fix(r.eco, 2) : null) : '';
+      const ev  = hasEv ? nc(r.kw != null ? fix(r.kw, 2) : null) + nc(r.eco != null ? fix(r.eco, 2) : null) : '';
       tb.insertAdjacentHTML('beforeend',
         '<tr>' +
-        '<td>' + r.name + '</td>' +
+        '<td>' + r.name  + '</td>' +
         '<td>' + r.group + '</td>' +
-        '<td>' + r.date + '</td>' +
+        '<td>' + r.date  + '</td>' +
         nc(fix(r.mi,1)) + nc(fix(r.dH,2)) + nc(fix(r.iH,2)) + nc(fix(r.eH,2)) +
         nc(r.fg  != null ? fix(r.fg,3)  : null) +
         nc(r.gph != null ? fix(r.gph,3) : null) +
@@ -318,7 +313,7 @@ geotab.addin.gphUtilization = function (api, state) {
         ev +
         '<td><div class="util-cell">' +
           '<div class="util-bar"><div class="util-fill" style="width:' + bw + 'px;background:' + col + '"></div></div>' +
-          '<span class="util-lbl" style="color:' + col + '">' + (r.util*100).toFixed(1) + '%</span>' +
+          '<span class="util-lbl" style="color:' + col + '">' + (r.util * 100).toFixed(1) + '%</span>' +
         '</div></td>' +
         '</tr>');
     });
@@ -327,13 +322,13 @@ geotab.addin.gphUtilization = function (api, state) {
 
   function renderSummary(rows) {
     if (!rows.length) return;
-    const au = rows.reduce((s,r)=>s+r.util,0)/rows.length;
-    const gr = rows.filter(r=>r.gph!=null), kr = rows.filter(r=>r.kw!=null);
+    const au = rows.reduce((s, r) => s + r.util, 0) / rows.length;
+    const gr = rows.filter(r => r.gph != null), kr = rows.filter(r => r.kw != null);
     document.getElementById('sCount').textContent = rows.length;
-    document.getElementById('sUtil').textContent  = (au*100).toFixed(1)+'%';
-    document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s,r)=>s+r.gph,0)/gr.length).toFixed(3) : '—';
+    document.getElementById('sUtil').textContent  = (au * 100).toFixed(1) + '%';
+    document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s, r) => s + r.gph, 0) / gr.length).toFixed(3) : '—';
     if (kr.length) {
-      document.getElementById('sKwh').textContent = (kr.reduce((s,r)=>s+r.kw,0)/kr.length).toFixed(2);
+      document.getElementById('sKwh').textContent = (kr.reduce((s, r) => s + r.kw, 0) / kr.length).toFixed(2);
       document.getElementById('sEvWrap').style.display = '';
     }
     document.getElementById('summary').classList.add('show');
@@ -342,12 +337,14 @@ geotab.addin.gphUtilization = function (api, state) {
   function exportXls() {
     if (!data.length) return;
     const hdrs = ['Device','Groups','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
-    if (hasEv) hdrs.push('EV Energy Used (kWh)','EV Energy Economy (kWh/hr)');
+    if (hasEv) hdrs.push('EV Energy Used (kWh)', 'EV Energy Economy (kWh/hr)');
     hdrs.push('Utilization (%)');
     const ws = XLSX.utils.aoa_to_sheet([hdrs, ...data.map(r => {
       const row = [r.name, r.group, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
-        r.fg !=null?fix(r.fg,3):'', r.gph!=null?fix(r.gph,3):'', r.hpg!=null?fix(r.hpg,3):''];
-      if (hasEv) row.push(r.kw!=null?fix(r.kw,2):'', r.eco!=null?fix(r.eco,2):'');
+        r.fg  != null ? fix(r.fg,3)  : '',
+        r.gph != null ? fix(r.gph,3) : '',
+        r.hpg != null ? fix(r.hpg,3) : ''];
+      if (hasEv) row.push(r.kw != null ? fix(r.kw,2) : '', r.eco != null ? fix(r.eco,2) : '');
       row.push(fix(r.util * 100, 1)); return row;
     })]);
     const wb = XLSX.utils.book_new();
@@ -359,12 +356,27 @@ geotab.addin.gphUtilization = function (api, state) {
   return {
     initialize(fa, fs, cb) {
       api = fa; state = fs;
-      const yd = new Date(); yd.setDate(yd.getDate()-1);
-      const s = yd.toISOString().slice(0,10);
+      const yd = new Date(); yd.setDate(yd.getDate() - 1);
+      const s = yd.toISOString().slice(0, 10);
       document.getElementById('fromDate').value = s;
       document.getElementById('toDate').value   = s;
       document.getElementById('runBtn').addEventListener('click', run);
       document.getElementById('exportBtn').addEventListener('click', exportXls);
+
+      // Load groups once on init so the dropdown is ready immediately
+      api.call('Get', { typeName: 'Group', search: {}, resultsLimit: 10000 }, function(grps) {
+        const sel = document.getElementById('groupFilter');
+        (grps || []).forEach(g => { if (g.id && g.name) gm[g.id] = g.name; });
+        (grps || [])
+          .filter(g => g.name && !g.id.startsWith('Group'))  // exclude system groups
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.id; opt.textContent = g.name;
+            sel.appendChild(opt);
+          });
+      });
+
       cb();
     },
     focus(fa, fs) { api = fa; state = fs; },
