@@ -5,81 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GPH &amp; Utilization</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Segoe UI", Arial, sans-serif; background: #f4f6f9; color: #2d3748; font-size: 13px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+    body { background: #f4f5f7; color: #333; font-size: 13px; }
 
-    /* Header */
-    .hdr { background: #1a56a0 !important; color: #fff !important; padding: 10px 16px; border-bottom: 3px solid #124587; }
-    .hdr h1 { font-size: 15px; font-weight: 600; color: #fff !important; }
-    .hdr p  { font-size: 11px; opacity: .7; margin-top: 2px; color: #fff !important; }
+    /* ── Header ── */
+    .header { background: #00457c; color: #fff; padding: 12px 16px; }
+    .header h1 { font-size: 15px; font-weight: 600; }
+    .header p  { font-size: 11px; opacity: .75; margin-top: 2px; }
 
-    /* Controls */
-    .ctrl { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+    /* ── Controls ── */
+    .controls {
+      background: #fff; border-bottom: 1px solid #ddd;
+      padding: 12px 16px; display: flex; align-items: flex-start; gap: 20px; flex-wrap: wrap;
+    }
+    .ctrl-main { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
     .field { display: flex; flex-direction: column; gap: 4px; }
-    .field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #718096; }
+    .field label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #666; }
     .field input[type=date] {
-      border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 9px;
-      font-size: 12px; color: #2d3748; background: #fff; outline: none; width: 140px;
+      border: 1px solid #ccc; border-radius: 3px; padding: 5px 8px;
+      font-size: 12px; color: #333; background: #fff; outline: none; width: 138px;
     }
-    .field input[type=date]:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
-    .btn { height: 30px; padding: 0 14px; border: none; border-radius: 5px; font-size: 12px; font-weight: 600; cursor: pointer; letter-spacing: .2px; }
-    .btn-run    { background: #1a56a0; color: #fff; }
-    .btn-run:hover    { background: #154480; }
-    .btn-export { background: #276749; color: #fff; }
-    .btn-export:hover { background: #1f5238; }
-    .btn:disabled { background: #a0aec0; cursor: not-allowed; }
+    .field input[type=date]:focus { border-color: #00457c; }
+    .btn { height: 30px; padding: 0 14px; border: none; border-radius: 3px; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .btn-run    { background: #00457c; color: #fff; }
+    .btn-run:hover    { background: #003566; }
+    .btn-export { background: #2d6a4f; color: #fff; }
+    .btn-export:hover { background: #1f4e38; }
+    .btn:disabled { background: #aaa; cursor: not-allowed; }
 
-    /* Searchable group dropdown */
-    .grp-wrap { position: relative; width: 200px; }
-    .grp-input {
-      width: 100%; border: 1px solid #cbd5e0; border-radius: 5px; padding: 5px 28px 5px 9px;
-      font-size: 12px; color: #2d3748; background: #fff; outline: none; height: 30px;
+    /* ── Group filter panel ── */
+    .grp-panel { display: flex; flex-direction: column; gap: 4px; }
+    .grp-panel > label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #666; }
+    .grp-search {
+      border: 1px solid #ccc; border-radius: 3px; padding: 5px 8px;
+      font-size: 12px; color: #333; background: #fff; outline: none; width: 200px;
     }
-    .grp-input:focus { border-color: #1a56a0; box-shadow: 0 0 0 2px rgba(26,86,160,.18); }
-    .grp-input.has-value { font-weight: 600; }
-    .grp-clear {
-      position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
-      font-size: 14px; color: #a0aec0; cursor: pointer; display: none; line-height: 1;
-      background: none; border: none; padding: 0;
+    .grp-search:focus { border-color: #00457c; }
+    .grp-list {
+      width: 200px; height: 156px; overflow-y: auto;
+      border: 1px solid #ccc; border-radius: 3px; background: #fff;
     }
-    .grp-clear:hover { color: #e53e3e; }
-    .grp-drop {
-      position: absolute; top: calc(100% + 2px); left: 0; right: 0;
-      background: #fff; border: 1px solid #cbd5e0; border-radius: 5px;
-      max-height: 220px; overflow-y: auto; z-index: 1000;
-      box-shadow: 0 4px 12px rgba(0,0,0,.12); display: none;
+    .grp-item {
+      padding: 6px 10px; font-size: 12px; cursor: pointer;
+      border-bottom: 1px solid #f0f0f0; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
     }
-    .grp-drop.open { display: block; }
-    .grp-opt {
-      padding: 7px 10px; font-size: 12px; cursor: pointer; color: #2d3748;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .grp-opt:hover   { background: #ebf4ff; }
-    .grp-opt.active  { background: #e8f0fe; font-weight: 600; color: #1a56a0; }
-    .grp-opt.no-match { color: #a0aec0; cursor: default; font-style: italic; }
-    .grp-opt.no-match:hover { background: none; }
+    .grp-item:last-child { border-bottom: none; }
+    .grp-item:hover { background: #f0f5ff; }
+    .grp-item.selected { background: #e8f0fe; font-weight: 600; color: #00457c; }
+    .grp-item.placeholder { color: #aaa; font-style: italic; cursor: default; }
+    .grp-item.placeholder:hover { background: none; }
 
-    /* Status */
-    .status { margin: 8px 16px 0; padding: 7px 12px; border-radius: 5px; font-size: 12px; display: none; background: #fefcbf; border-left: 3px solid #d69e2e; }
-    .status.err { background: #fed7d7; border-color: #e53e3e; color: #742a2a; }
+    /* ── Status bar ── */
+    .status-bar {
+      margin: 8px 16px; padding: 7px 10px; border-radius: 3px; font-size: 12px;
+      background: #fff3cd; border-left: 3px solid #ffc107; display: none;
+    }
+    .status-bar.err { background: #f8d7da; border-color: #dc3545; color: #721c24; }
 
-    /* Summary bar */
-    .summary { display: none; margin: 8px 16px 0; padding: 6px 14px; background: #fff; border: 1px solid #e2e8f0; border-radius: 5px; font-size: 12px; color: #4a5568; gap: 20px; flex-wrap: wrap; }
-    .summary.show { display: flex; }
-    .summary b { color: #1a202c; }
+    /* ── Summary cards ── */
+    .cards { padding: 12px 16px 0; display: none; gap: 12px; flex-wrap: wrap; }
+    .cards.show { display: flex; }
+    .card {
+      background: #fff; border-radius: 4px; padding: 10px 14px; flex: 1; min-width: 120px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08); border-top: 3px solid #00457c;
+    }
+    .card-label { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: #777; font-weight: 700; margin-bottom: 3px; }
+    .card-value { font-size: 20px; font-weight: 700; color: #00457c; font-variant-numeric: tabular-nums; }
+    .card-sub   { font-size: 10px; color: #aaa; margin-top: 2px; }
 
-    /* Table wrapper */
-    .tbl-outer { padding: 10px 16px 20px; overflow-x: auto; }
-    .no-data { text-align: center; padding: 48px 0; color: #a0aec0; font-size: 13px; display: none; }
+    /* ── Table ── */
+    .tbl-outer { padding: 12px 16px 24px; overflow-x: auto; }
+    .no-data   { text-align: center; padding: 48px 0; color: #aaa; font-size: 13px; display: none; }
 
     #tbl {
       border-collapse: collapse !important;
       font-size: 12px !important;
       table-layout: fixed !important;
-      min-width: 1220px !important;
+      min-width: 1200px !important;
     }
-
-    /* Column widths */
     col.c-name  { width: 130px; }
     col.c-group { width: 130px; }
     col.c-date  { width: 100px; }
@@ -87,81 +91,95 @@
     col.c-util  { width: 130px; }
 
     #tbl thead tr th {
-      padding: 8px 10px !important;
+      padding: 7px 10px !important;
       font-size: 11px !important;
-      font-weight: 700 !important;
+      font-weight: 600 !important;
       text-align: center !important;
       white-space: nowrap !important;
-      border-bottom: 2px solid #fff !important;
-      border-right: 2px solid rgba(255,255,255,.5) !important;
+      border-bottom: none !important;
+      border-right: 1px solid rgba(255,255,255,.35) !important;
       vertical-align: middle !important;
       cursor: help;
     }
     #tbl thead th:last-child { border-right: none !important; }
-
-    /* Header section colours */
     #tbl thead th.h-base { background: #2d3a4e !important; color: #fff !important; }
-    #tbl thead th.h-fuel { background: #1a56a0 !important; color: #fff !important; }
-    #tbl thead th.h-ev   { background: #276749 !important; color: #fff !important; }
+    #tbl thead th.h-fuel { background: #00457c !important; color: #fff !important; }
+    #tbl thead th.h-ev   { background: #2d6a4f !important; color: #fff !important; }
     #tbl thead th.h-util { background: #553c9a !important; color: #fff !important; }
 
-    #tbl tbody tr { border-bottom: 1px solid #d0d7e2 !important; background: #fff !important; }
-    #tbl tbody tr:nth-child(even) { background: #f7fafc !important; }
-    #tbl tbody tr:hover { background: #ebf4ff !important; }
-
+    #tbl tbody tr { border-bottom: 1px solid #f0f0f0 !important; background: #fff !important; }
+    #tbl tbody tr:nth-child(even) { background: #fafafa !important; }
+    #tbl tbody tr:hover { background: #f0f5ff !important; }
     #tbl tbody td {
       padding: 6px 10px !important;
       text-align: center !important;
       white-space: nowrap !important;
       overflow: hidden !important;
       text-overflow: ellipsis !important;
-      border-right: 2px solid #d0d7e2 !important;
+      border-right: 1px solid #eee !important;
       border-top: none !important;
       border-left: none !important;
       border-bottom: none !important;
       font-variant-numeric: tabular-nums !important;
-      color: #2d3748 !important;
+      color: #333 !important;
       font-size: 12px !important;
     }
     #tbl tbody td:last-child { border-right: none !important; }
-    #tbl tbody td.na { color: #cbd5e0 !important; text-align: center !important; }
+    #tbl tbody td.na { color: #ccc !important; }
 
-    /* Utilization cell */
+    /* Utilization bar */
     .util-cell { display: flex !important; align-items: center !important; gap: 6px !important; justify-content: center !important; }
-    .util-bar  { flex-shrink: 0; width: 46px; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
-    .util-fill { height: 100%; border-radius: 4px; }
-    .util-lbl  { font-weight: 700; font-size: 12px; min-width: 40px; text-align: center; }
+    .util-bar  { flex-shrink: 0; width: 46px; height: 6px; background: #e9ecef; border-radius: 3px; overflow: hidden; }
+    .util-fill { height: 100%; border-radius: 3px; }
+    .util-lbl  { font-weight: 700; font-size: 12px; min-width: 38px; text-align: center; }
   </style>
 </head>
 <body>
 
-<div class="hdr">
+<div class="header">
   <h1>GPH &amp; Utilization Report</h1>
   <p>Fuel &bull; EV energy &bull; Utilization (21.7 hr threshold) &bull; Hover column headers for definitions</p>
 </div>
 
-<div class="ctrl">
-  <div class="field"><label>From Date</label><input type="date" id="fromDate"></div>
-  <div class="field"><label>To Date</label><input type="date" id="toDate"></div>
-  <div class="field">
-    <label>Group</label>
-    <div class="grp-wrap" id="grpWrap">
-      <input type="text" class="grp-input" id="grpInput" placeholder="All Groups" autocomplete="off">
-      <button class="grp-clear" id="grpClear" title="Clear">&times;</button>
-      <div class="grp-drop" id="grpDrop"></div>
+<div class="controls">
+  <div class="ctrl-main">
+    <div class="field"><label>From Date</label><input type="date" id="fromDate"></div>
+    <div class="field"><label>To Date</label><input type="date" id="toDate"></div>
+    <button class="btn btn-run" id="runBtn">Run Report</button>
+    <button class="btn btn-export" id="exportBtn" disabled>Export to Excel</button>
+  </div>
+  <div class="grp-panel">
+    <label>Filter by Group</label>
+    <input type="text" class="grp-search" id="grpSearch" placeholder="Search groups…" autocomplete="off">
+    <div class="grp-list" id="grpList">
+      <div class="grp-item placeholder">Loading groups…</div>
     </div>
   </div>
-  <button class="btn btn-run"    id="runBtn"    style="margin-bottom:0">Run Report</button>
-  <button class="btn btn-export" id="exportBtn" style="margin-bottom:0" disabled>Export to Excel</button>
 </div>
 
-<div class="status" id="status"></div>
+<div class="status-bar" id="statusBar"></div>
 
-<div class="summary" id="summary">
-  <span>Rows: <b id="sCount">—</b></span>
-  <span>Avg GPH: <b id="sGph">—</b></span>
-  <span>Avg Utilization: <b id="sUtil">—</b></span>
-  <span id="sEvWrap" style="display:none">Avg kWh/day: <b id="sKwh">—</b></span>
+<div class="cards" id="cardsRow">
+  <div class="card">
+    <div class="card-label">Total Rows</div>
+    <div class="card-value" id="sCount">—</div>
+    <div class="card-sub">asset-days</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Avg GPH</div>
+    <div class="card-value" id="sGph">—</div>
+    <div class="card-sub">gal / engine-on hour</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Avg Utilization</div>
+    <div class="card-value" id="sUtil">—</div>
+    <div class="card-sub">vs 21.7 hr threshold</div>
+  </div>
+  <div class="card" id="sEvCard" style="display:none">
+    <div class="card-label">Avg kWh/day</div>
+    <div class="card-value" id="sKwh">—</div>
+    <div class="card-sub">EV assets only</div>
+  </div>
 </div>
 
 <div class="tbl-outer">
@@ -220,110 +238,71 @@ geotab.addin.gphUtilization = function (api, state) {
   const dk  = dt => String(dt).slice(0, 10);
   const fix = (n, dp) => (n == null || isNaN(n)) ? null : +n.toFixed(dp);
 
-  function status(msg, err) {
-    const el = document.getElementById('status');
+  function setStatus(msg, err) {
+    const el = document.getElementById('statusBar');
     if (!msg) { el.style.display = 'none'; return; }
-    el.textContent = msg; el.className = 'status' + (err ? ' err' : ''); el.style.display = 'block';
+    el.textContent = msg;
+    el.className = 'status-bar' + (err ? ' err' : '');
+    el.style.display = 'block';
   }
 
   function getDays(from, to) {
-    const days = [];
-    const d = new Date(from + 'T00:00:00Z');
-    const end = new Date(to + 'T00:00:00Z');
-    while (d <= end) {
-      days.push(d.toISOString().slice(0, 10));
-      d.setUTCDate(d.getUTCDate() + 1);
-    }
+    const days = [], d = new Date(from + 'T00:00:00Z'), end = new Date(to + 'T00:00:00Z');
+    while (d <= end) { days.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); }
     return days;
   }
 
-  // --- Searchable group dropdown ---
+  // ── Group listbox ──
 
-  function buildDropdown(q) {
-    const drop = document.getElementById('grpDrop');
-    drop.innerHTML = '';
+  function buildGroupList(q) {
+    const el = document.getElementById('grpList');
+    el.innerHTML = '';
     const query = (q || '').toLowerCase().trim();
-
-    // "All Groups" option
-    const all = document.createElement('div');
-    all.className = 'grp-opt' + (selectedGroupId === '' ? ' active' : '');
-    all.textContent = 'All Groups';
-    all.addEventListener('mousedown', function(e) { e.preventDefault(); selectGroup('', ''); });
-    drop.appendChild(all);
-
     const matches = query ? groupList.filter(g => g.name.toLowerCase().includes(query)) : groupList;
+
+    const allItem = document.createElement('div');
+    allItem.className = 'grp-item' + (selectedGroupId === '' ? ' selected' : '');
+    allItem.textContent = 'All Groups';
+    allItem.addEventListener('click', () => selectGroup('', ''));
+    el.appendChild(allItem);
+
     if (!matches.length && query) {
       const nm = document.createElement('div');
-      nm.className = 'grp-opt no-match';
-      nm.textContent = 'No groups match "' + q + '"';
-      drop.appendChild(nm);
+      nm.className = 'grp-item placeholder';
+      nm.textContent = 'No matches';
+      el.appendChild(nm);
     } else {
       matches.forEach(g => {
-        const opt = document.createElement('div');
-        opt.className = 'grp-opt' + (selectedGroupId === g.id ? ' active' : '');
-        opt.textContent = g.name;
-        opt.addEventListener('mousedown', function(e) { e.preventDefault(); selectGroup(g.id, g.name); });
-        drop.appendChild(opt);
+        const item = document.createElement('div');
+        item.className = 'grp-item' + (selectedGroupId === g.id ? ' selected' : '');
+        item.textContent = g.name;
+        item.title = g.name;
+        item.addEventListener('click', () => selectGroup(g.id, g.name));
+        el.appendChild(item);
       });
     }
   }
 
   function selectGroup(id, name) {
     selectedGroupId = id;
-    const inp = document.getElementById('grpInput');
-    inp.value = name;
-    inp.placeholder = name || 'All Groups';
-    inp.className = 'grp-input' + (name ? ' has-value' : '');
-    document.getElementById('grpClear').style.display = name ? 'block' : 'none';
-    document.getElementById('grpDrop').classList.remove('open');
-    inp.blur();
+    buildGroupList(document.getElementById('grpSearch').value);
+    const sel = document.getElementById('grpList').querySelector('.selected');
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
   }
 
-  function initGroupDropdown() {
-    const inp   = document.getElementById('grpInput');
-    const drop  = document.getElementById('grpDrop');
-    const clear = document.getElementById('grpClear');
-
-    inp.addEventListener('focus', function() {
-      buildDropdown(inp.value);
-      drop.classList.add('open');
-    });
-    inp.addEventListener('input', function() {
-      buildDropdown(inp.value);
-      drop.classList.add('open');
-    });
-    inp.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') { drop.classList.remove('open'); inp.blur(); }
-    });
-    clear.addEventListener('click', function() { selectGroup('', ''); });
-
-    document.addEventListener('click', function(e) {
-      if (!document.getElementById('grpWrap').contains(e.target)) {
-        drop.classList.remove('open');
-        // if input text doesn't match selection, reset to selected name
-        if (selectedGroupId) {
-          const match = groupList.find(g => g.id === selectedGroupId);
-          inp.value = match ? match.name : '';
-        } else {
-          inp.value = '';
-        }
-      }
-    });
-  }
-
-  // --- Run ---
+  // ── Run ──
 
   function run() {
     const from = document.getElementById('fromDate').value;
     const to   = document.getElementById('toDate').value;
-    if (!from || !to) { status('Select a date range.', true); return; }
+    if (!from || !to) { setStatus('Select a date range.', true); return; }
 
-    status('Loading…');
+    setStatus('Loading…');
     document.getElementById('runBtn').disabled = true;
     document.getElementById('exportBtn').disabled = true;
     document.getElementById('tbl').style.display = 'none';
     document.getElementById('noData').style.display = 'none';
-    document.getElementById('summary').classList.remove('show');
+    document.getElementById('cardsRow').classList.remove('show');
 
     const deviceSearch = selectedGroupId ? { groups: [{ id: selectedGroupId }] } : {};
 
@@ -349,9 +328,9 @@ geotab.addin.gphUtilization = function (api, state) {
           else             (res || []).forEach(f => allFuel.push(f));
         });
         process(nm, devGroups, allTrips, allFuel);
-      }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
+      }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
 
-    }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
+    }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
   function process(nm, devGroups, trips, fuel) {
@@ -366,7 +345,7 @@ geotab.addin.gphUtilization = function (api, state) {
     for (const f of fuel) {
       const k = f.device.id + '|' + dk(f.dateTime);
       if (!fm[k]) fm[k] = { fL: 0, kWh: 0 };
-      fm[k].fL  += f.totalFuelUsed     || 0;
+      fm[k].fL  += f.totalFuelUsed      || 0;
       fm[k].kWh += f.totalEnergyUsedKwh || 0;
     }
     hasEv = false;
@@ -390,7 +369,7 @@ geotab.addin.gphUtilization = function (api, state) {
     ['th-kwh','th-eveco','col-kwh','col-eveco'].forEach(id => {
       document.getElementById(id).style.display = hasEv ? '' : 'none';
     });
-    render(data); renderSummary(data); status(null);
+    render(data); renderSummary(data); setStatus(null);
     document.getElementById('runBtn').disabled = false;
     document.getElementById('exportBtn').disabled = data.length === 0;
   }
@@ -433,9 +412,9 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s, r) => s + r.gph, 0) / gr.length).toFixed(3) : '—';
     if (kr.length) {
       document.getElementById('sKwh').textContent = (kr.reduce((s, r) => s + r.kw, 0) / kr.length).toFixed(2);
-      document.getElementById('sEvWrap').style.display = '';
+      document.getElementById('sEvCard').style.display = '';
     }
-    document.getElementById('summary').classList.add('show');
+    document.getElementById('cardsRow').classList.add('show');
   }
 
   function exportXls() {
@@ -466,15 +445,16 @@ geotab.addin.gphUtilization = function (api, state) {
       document.getElementById('toDate').value   = s;
       document.getElementById('runBtn').addEventListener('click', run);
       document.getElementById('exportBtn').addEventListener('click', exportXls);
+      document.getElementById('grpSearch').addEventListener('input', function() {
+        buildGroupList(this.value);
+      });
 
-      initGroupDropdown();
-
-      // Load groups once so dropdown is ready before first Run
       api.call('Get', { typeName: 'Group', search: {}, resultsLimit: 10000 }, function(grps) {
         (grps || []).forEach(g => { if (g.id && g.name) gm[g.id] = g.name; });
         groupList = (grps || [])
           .filter(g => g.name && !g.id.startsWith('Group'))
           .sort((a, b) => a.name.localeCompare(b.name));
+        buildGroupList('');
       });
 
       cb();
