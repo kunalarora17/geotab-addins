@@ -331,6 +331,12 @@ geotab.addin.gphUtilization = function (api, state) {
     })]);
     const cw = [22,12,18,20,18,16,16,14,16,...(hasEv?[16,22]:[]),14];
     ws['!cols'] = cw.map(w=>({wch:w}));
+    // Apply percentage format to the Utilization column so Excel shows e.g. 85.3% directly
+    const utilCol = hdrs.length - 1;
+    for (let i = 1; i <= data.length; i++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: i, c: utilCol })];
+      if (cell) cell.z = '0.0%';
+    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'GPH & Utilization');
     const f = document.getElementById('fromDate').value, t = document.getElementById('toDate').value;
