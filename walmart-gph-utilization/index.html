@@ -9,9 +9,9 @@
     body { font-family: "Segoe UI", Arial, sans-serif; background: #f4f6f9; color: #2d3748; font-size: 13px; }
 
     /* Header */
-    .hdr { background: #1a56a0; color: #fff; padding: 10px 16px; border-bottom: 3px solid #1245870; }
-    .hdr h1 { font-size: 15px; font-weight: 600; }
-    .hdr p  { font-size: 11px; opacity: .7; margin-top: 2px; }
+    .hdr { background: #1a56a0 !important; color: #fff !important; padding: 10px 16px; border-bottom: 3px solid #124587; }
+    .hdr h1 { font-size: 15px; font-weight: 600; color: #fff !important; }
+    .hdr p  { font-size: 11px; opacity: .7; margin-top: 2px; color: #fff !important; }
 
     /* Controls */
     .ctrl { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
@@ -35,15 +35,15 @@
     .summary.show { display: flex; }
     .summary b { color: #1a202c; }
 
-    /* Table wrapper — horizontal scroll */
+    /* Table wrapper */
     .tbl-outer { padding: 10px 16px 20px; overflow-x: auto; }
     .no-data { text-align: center; padding: 48px 0; color: #a0aec0; font-size: 13px; display: none; }
 
-    table {
-      border-collapse: collapse;
-      font-size: 12px;
-      table-layout: fixed;
-      min-width: 1100px;
+    #tbl {
+      border-collapse: collapse !important;
+      font-size: 12px !important;
+      table-layout: fixed !important;
+      min-width: 1100px !important;
     }
 
     /* Column widths */
@@ -52,42 +52,52 @@
     col.c-num   { width: 105px; }
     col.c-util  { width: 130px; }
 
-    thead tr th {
-      padding: 8px 10px;
-      font-size: 11px; font-weight: 700;
-      text-align: center;
-      white-space: nowrap;
-      border-bottom: 2px solid #fff;
-      border-right: 2px solid rgba(255,255,255,.5);
+    #tbl thead tr th {
+      padding: 8px 10px !important;
+      font-size: 11px !important;
+      font-weight: 700 !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      border-bottom: 2px solid #fff !important;
+      border-right: 2px solid rgba(255,255,255,.5) !important;
+      vertical-align: middle !important;
+      cursor: help;
     }
-    thead th:first-child, thead th:nth-child(2) { text-align: left; }
-    thead th:last-child { border-right: none; }
+    #tbl thead th:first-child,
+    #tbl thead th:nth-child(2) { text-align: left !important; }
+    #tbl thead th:last-child { border-right: none !important; }
 
     /* Header section colours */
-    .h-base { background: #2d3a4e; color: #fff; }
-    .h-fuel { background: #1a56a0; color: #fff; }
-    .h-ev   { background: #276749; color: #fff; }
-    .h-util { background: #553c9a; color: #fff; }
+    #tbl thead th.h-base { background: #2d3a4e !important; color: #fff !important; }
+    #tbl thead th.h-fuel { background: #1a56a0 !important; color: #fff !important; }
+    #tbl thead th.h-ev   { background: #276749 !important; color: #fff !important; }
+    #tbl thead th.h-util { background: #553c9a !important; color: #fff !important; }
 
-    tbody tr { border-bottom: 1px solid #d0d7e2; }
-    tbody tr:nth-child(even) { background: #f7fafc; }
-    tbody tr:hover { background: #ebf4ff !important; }
+    #tbl tbody tr { border-bottom: 1px solid #d0d7e2 !important; background: #fff !important; }
+    #tbl tbody tr:nth-child(even) { background: #f7fafc !important; }
+    #tbl tbody tr:hover { background: #ebf4ff !important; }
 
-    tbody td {
-      padding: 6px 10px;
-      text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      border-right: 2px solid #d0d7e2;
-      font-variant-numeric: tabular-nums;
+    #tbl tbody td {
+      padding: 6px 10px !important;
+      text-align: center !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      border-right: 2px solid #d0d7e2 !important;
+      border-top: none !important;
+      border-left: none !important;
+      border-bottom: none !important;
+      font-variant-numeric: tabular-nums !important;
+      color: #2d3748 !important;
+      font-size: 12px !important;
     }
-    tbody td:first-child, tbody td:nth-child(2) { text-align: left; }
-    tbody td:last-child { border-right: none; }
-    tbody td.na { color: #cbd5e0; text-align: center; }
+    #tbl tbody td:first-child,
+    #tbl tbody td:nth-child(2) { text-align: left !important; }
+    #tbl tbody td:last-child { border-right: none !important; }
+    #tbl tbody td.na { color: #cbd5e0 !important; text-align: center !important; }
 
     /* Utilization cell */
-    .util-cell { display: flex; align-items: center; gap: 6px; justify-content: center; }
+    .util-cell { display: flex !important; align-items: center !important; gap: 6px !important; justify-content: center !important; }
     .util-bar  { flex-shrink: 0; width: 46px; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .util-fill { height: 100%; border-radius: 4px; }
     .util-lbl  { font-weight: 700; font-size: 12px; min-width: 40px; text-align: right; }
@@ -97,7 +107,7 @@
 
 <div class="hdr">
   <h1>GPH &amp; Utilization Report</h1>
-  <p>Fuel &bull; EV energy &bull; Utilization (21.7 hr threshold)</p>
+  <p>Fuel &bull; EV energy &bull; Utilization (21.7 hr threshold) &bull; Hover column headers for definitions</p>
 </div>
 
 <div class="ctrl">
@@ -134,18 +144,18 @@
     </colgroup>
     <thead>
       <tr>
-        <th class="h-base" style="text-align:left">Asset Name</th>
-        <th class="h-base" style="text-align:left">Date</th>
-        <th class="h-base">Distance (mi)</th>
-        <th class="h-base">Driving (hrs)</th>
-        <th class="h-base">Idling (hrs)</th>
-        <th class="h-base">Engine ON (hrs)</th>
-        <th class="h-fuel">Fuel Used (gal)</th>
-        <th class="h-fuel">Gallons / Hour</th>
-        <th class="h-fuel">Hours / Gallon</th>
-        <th class="h-ev" id="th-kwh"   style="display:none">Energy (kWh)</th>
-        <th class="h-ev" id="th-eveco" style="display:none">kWh / 100 mi</th>
-        <th class="h-util">Utilization</th>
+        <th class="h-base" title="Asset / vehicle name as configured in MyGeotab">Asset Name</th>
+        <th class="h-base" title="Date of the recorded activity (UTC day)">Date</th>
+        <th class="h-base" title="Total miles driven for the day (converted from km reported by Geotab)">Distance (mi)</th>
+        <th class="h-base" title="Total hours the vehicle was actively moving">Driving (hrs)</th>
+        <th class="h-base" title="Total hours the engine was on but the vehicle was stationary">Idling (hrs)</th>
+        <th class="h-base" title="Engine ON Hours = Driving Hours + Idling Hours. Used as the denominator for GPH.">Engine ON (hrs)</th>
+        <th class="h-fuel" title="Total fuel consumed for the day in US gallons (converted from liters)">Fuel Used (gal)</th>
+        <th class="h-fuel" title="Gallons Per Hour = Fuel Used ÷ Engine ON Hours. Measures fuel burn rate — lower is more efficient.">Gallons / Hour</th>
+        <th class="h-fuel" title="Hours Per Gallon = Engine ON Hours ÷ Fuel Used. Inverse of GPH — higher is better.">Hours / Gallon</th>
+        <th class="h-ev" id="th-kwh"   style="display:none" title="Total electric energy consumed by EV assets in kilowatt-hours">Energy (kWh)</th>
+        <th class="h-ev" id="th-eveco" style="display:none" title="EV energy economy: kWh used per 100 miles driven. Lower means more efficient.">kWh / 100 mi</th>
+        <th class="h-util" title="Utilization = Driving Hours ÷ 21.7 hrs (Walmart threshold). Green ≥100%, Yellow ≥70%, Red &lt;70%.">Utilization</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -176,11 +186,22 @@ geotab.addin.gphUtilization = function (api, state) {
     el.textContent = msg; el.className = 'status' + (err ? ' err' : ''); el.style.display = 'block';
   }
 
+  function getDays(from, to) {
+    const days = [];
+    const d = new Date(from + 'T00:00:00Z');
+    const end = new Date(to + 'T00:00:00Z');
+    while (d <= end) {
+      days.push(d.toISOString().slice(0, 10));
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return days;
+  }
+
   function run() {
     const from = document.getElementById('fromDate').value;
     const to   = document.getElementById('toDate').value;
     if (!from || !to) { status('Select a date range.', true); return; }
-    const fISO = from + 'T00:00:00.000Z', tISO = to + 'T23:59:59.999Z';
+
     status('Loading devices…');
     document.getElementById('runBtn').disabled = true;
     document.getElementById('exportBtn').disabled = true;
@@ -191,14 +212,30 @@ geotab.addin.gphUtilization = function (api, state) {
     api.call('Get', { typeName: 'Device', search: {}, resultsLimit: 50000 }, function(devs) {
       const nm = {};
       (devs||[]).forEach(d => { nm[d.id] = d.name || d.id; });
-      status('Loading trips…');
-      api.call('Get', { typeName: 'Trip', search: { fromDate: fISO, toDate: tISO }, resultsLimit: 50000 }, function(trips) {
-        status('Loading fuel & energy…');
-        api.call('Get', { typeName: 'FuelAndEnergyUsed', search: { fromDate: fISO, toDate: tISO }, resultsLimit: 50000 },
-          function(fuel) { process(nm, trips||[], fuel||[]); },
-          function()     { process(nm, trips||[], []); }
-        );
-      }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
+
+      const days = getDays(from, to);
+      const allTrips = [], allFuel = [];
+      let i = 0;
+
+      function nextDay() {
+        if (i >= days.length) {
+          process(nm, allTrips, allFuel);
+          return;
+        }
+        const day = days[i++];
+        const df = day + 'T00:00:00.000Z', dt = day + 'T23:59:59.999Z';
+        status('Loading ' + day + ' (' + i + '/' + days.length + ')…');
+
+        api.call('Get', { typeName: 'Trip', search: { fromDate: df, toDate: dt }, resultsLimit: 50000 }, function(trips) {
+          (trips || []).forEach(t => allTrips.push(t));
+          api.call('Get', { typeName: 'FuelAndEnergyUsed', search: { fromDate: df, toDate: dt }, resultsLimit: 50000 },
+            function(fuel) { (fuel || []).forEach(f => allFuel.push(f)); nextDay(); },
+            function()     { nextDay(); }
+          );
+        }, function(e) { status('Error on ' + day + ': ' + e, true); document.getElementById('runBtn').disabled = false; });
+      }
+
+      nextDay();
     }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
@@ -238,13 +275,13 @@ geotab.addin.gphUtilization = function (api, state) {
     ['th-kwh','th-eveco','col-kwh','col-eveco'].forEach(id => {
       document.getElementById(id).style.display = hasEv ? '' : 'none';
     });
-    render(data); summary(data); status(null);
+    render(data); renderSummary(data); status(null);
     document.getElementById('runBtn').disabled = false;
     document.getElementById('exportBtn').disabled = data.length === 0;
   }
 
   function uc(u) { return u >= 1 ? '#276749' : u >= 0.7 ? '#b7791f' : '#c53030'; }
-  function nc(v)  { return v != null ? `<td>${v}</td>` : '<td class="na">—</td>'; }
+  function nc(v)  { return v != null ? '<td>' + v + '</td>' : '<td class="na">—</td>'; }
 
   function render(rows) {
     const tb = document.getElementById('tbody');
@@ -254,31 +291,34 @@ geotab.addin.gphUtilization = function (api, state) {
       const col = uc(r.util), bw = Math.min(r.util, 1) * 46;
       const ev  = hasEv ? nc(r.kw  != null ? fix(r.kw, 2)  : null) + nc(r.eco != null ? fix(r.eco, 2) : null) : '';
       tb.insertAdjacentHTML('beforeend',
-        `<tr>
-          <td style="text-align:left">${r.name}</td>
-          <td style="text-align:left">${r.date}</td>
-          ${nc(fix(r.mi,1))} ${nc(fix(r.dH,2))} ${nc(fix(r.iH,2))} ${nc(fix(r.eH,2))}
-          ${nc(r.fg  != null ? fix(r.fg,3)  : null)}
-          ${nc(r.gph != null ? fix(r.gph,3) : null)}
-          ${nc(r.hpg != null ? fix(r.hpg,3) : null)}
-          ${ev}
-          <td><div class="util-cell">
-            <div class="util-bar"><div class="util-fill" style="width:${bw}px;background:${col}"></div></div>
-            <span class="util-lbl" style="color:${col}">${(r.util*100).toFixed(1)}%</span>
-          </div></td>
-        </tr>`);
+        '<tr>' +
+        '<td>' + r.name + '</td>' +
+        '<td>' + r.date + '</td>' +
+        nc(fix(r.mi,1)) + nc(fix(r.dH,2)) + nc(fix(r.iH,2)) + nc(fix(r.eH,2)) +
+        nc(r.fg  != null ? fix(r.fg,3)  : null) +
+        nc(r.gph != null ? fix(r.gph,3) : null) +
+        nc(r.hpg != null ? fix(r.hpg,3) : null) +
+        ev +
+        '<td><div class="util-cell">' +
+          '<div class="util-bar"><div class="util-fill" style="width:' + bw + 'px;background:' + col + '"></div></div>' +
+          '<span class="util-lbl" style="color:' + col + '">' + (r.util*100).toFixed(1) + '%</span>' +
+        '</div></td>' +
+        '</tr>');
     });
     document.getElementById('tbl').style.display = '';
   }
 
-  function summary(rows) {
+  function renderSummary(rows) {
     if (!rows.length) return;
     const au = rows.reduce((s,r)=>s+r.util,0)/rows.length;
     const gr = rows.filter(r=>r.gph!=null), kr = rows.filter(r=>r.kw!=null);
     document.getElementById('sCount').textContent = rows.length;
     document.getElementById('sUtil').textContent  = (au*100).toFixed(1)+'%';
     document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s,r)=>s+r.gph,0)/gr.length).toFixed(3) : '—';
-    if (kr.length) { document.getElementById('sKwh').textContent = (kr.reduce((s,r)=>s+r.kw,0)/kr.length).toFixed(2); document.getElementById('sEvWrap').style.display=''; }
+    if (kr.length) {
+      document.getElementById('sKwh').textContent = (kr.reduce((s,r)=>s+r.kw,0)/kr.length).toFixed(2);
+      document.getElementById('sEvWrap').style.display = '';
+    }
     document.getElementById('summary').classList.add('show');
   }
 
@@ -298,7 +338,7 @@ geotab.addin.gphUtilization = function (api, state) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'GPH & Utilization');
     const f = document.getElementById('fromDate').value, t = document.getElementById('toDate').value;
-    XLSX.writeFile(wb, `GPH_Utilization_${f}_to_${t}.xlsx`);
+    XLSX.writeFile(wb, 'GPH_Utilization_' + f + '_to_' + t + '.xlsx');
   }
 
   return {
