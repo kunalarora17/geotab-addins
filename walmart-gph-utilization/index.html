@@ -322,21 +322,13 @@ geotab.addin.gphUtilization = function (api, state) {
     if (!data.length) return;
     const hdrs = ['Device','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
     if (hasEv) hdrs.push('EV Energy Used (kWh)','EV Energy Economy (kWh/100mi)');
-    hdrs.push('Utilization');
+    hdrs.push('Utilization (%)');
     const ws = XLSX.utils.aoa_to_sheet([hdrs, ...data.map(r => {
       const row = [r.name, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
         r.fg !=null?fix(r.fg,3):'', r.gph!=null?fix(r.gph,3):'', r.hpg!=null?fix(r.hpg,3):''];
       if (hasEv) row.push(r.kw!=null?fix(r.kw,2):'', r.eco!=null?fix(r.eco,2):'');
-      row.push(fix(r.util,4)); return row;
+      row.push(fix(r.util * 100, 1)); return row;
     })]);
-    const cw = [22,12,18,20,18,16,16,14,16,...(hasEv?[16,22]:[]),14];
-    ws['!cols'] = cw.map(w=>({wch:w}));
-    // Apply percentage format to the Utilization column so Excel shows e.g. 85.3% directly
-    const utilCol = hdrs.length - 1;
-    for (let i = 1; i <= data.length; i++) {
-      const cell = ws[XLSX.utils.encode_cell({ r: i, c: utilCol })];
-      if (cell) cell.z = '0.0%';
-    }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'GPH & Utilization');
     const f = document.getElementById('fromDate').value, t = document.getElementById('toDate').value;
