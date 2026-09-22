@@ -55,10 +55,10 @@
     thead tr th {
       padding: 8px 10px;
       font-size: 11px; font-weight: 700;
-      text-align: right;
+      text-align: center;
       white-space: nowrap;
       border-bottom: 2px solid #fff;
-      border-right: 1px solid rgba(255,255,255,.25);
+      border-right: 2px solid rgba(255,255,255,.5);
     }
     thead th:first-child, thead th:nth-child(2) { text-align: left; }
     thead th:last-child { border-right: none; }
@@ -69,17 +69,17 @@
     .h-ev   { background: #276749; color: #fff; }
     .h-util { background: #553c9a; color: #fff; }
 
-    tbody tr { border-bottom: 1px solid #e8ecf0; }
+    tbody tr { border-bottom: 1px solid #d0d7e2; }
     tbody tr:nth-child(even) { background: #f7fafc; }
     tbody tr:hover { background: #ebf4ff !important; }
 
     tbody td {
       padding: 6px 10px;
-      text-align: right;
+      text-align: center;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      border-right: 1px solid #edf2f7;
+      border-right: 2px solid #d0d7e2;
       font-variant-numeric: tabular-nums;
     }
     tbody td:first-child, tbody td:nth-child(2) { text-align: left; }
@@ -87,7 +87,7 @@
     tbody td.na { color: #cbd5e0; text-align: center; }
 
     /* Utilization cell */
-    .util-cell { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+    .util-cell { display: flex; align-items: center; gap: 6px; justify-content: center; }
     .util-bar  { flex-shrink: 0; width: 46px; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
     .util-fill { height: 100%; border-radius: 4px; }
     .util-lbl  { font-weight: 700; font-size: 12px; min-width: 40px; text-align: right; }
