@@ -43,11 +43,12 @@
       border-collapse: collapse !important;
       font-size: 12px !important;
       table-layout: fixed !important;
-      min-width: 1100px !important;
+      min-width: 1220px !important;
     }
 
     /* Column widths */
     col.c-name  { width: 130px; }
+    col.c-group { width: 120px; }
     col.c-date  { width: 100px; }
     col.c-num   { width: 105px; }
     col.c-util  { width: 130px; }
@@ -64,7 +65,8 @@
       cursor: help;
     }
     #tbl thead th:first-child,
-    #tbl thead th:nth-child(2) { text-align: left !important; }
+    #tbl thead th:nth-child(2),
+    #tbl thead th:nth-child(3) { text-align: left !important; }
     #tbl thead th:last-child { border-right: none !important; }
 
     /* Header section colours */
@@ -92,7 +94,8 @@
       font-size: 12px !important;
     }
     #tbl tbody td:first-child,
-    #tbl tbody td:nth-child(2) { text-align: left !important; }
+    #tbl tbody td:nth-child(2),
+    #tbl tbody td:nth-child(3) { text-align: left !important; }
     #tbl tbody td:last-child { border-right: none !important; }
     #tbl tbody td.na { color: #cbd5e0 !important; text-align: center !important; }
 
@@ -130,6 +133,7 @@
   <table id="tbl" style="display:none">
     <colgroup>
       <col class="c-name">
+      <col class="c-group">
       <col class="c-date">
       <col class="c-num">
       <col class="c-num">
@@ -145,6 +149,7 @@
     <thead>
       <tr>
         <th class="h-base" title="Asset / vehicle name as configured in MyGeotab">Asset Name</th>
+        <th class="h-base" title="MyGeotab group(s) the asset belongs to">Groups</th>
         <th class="h-base" title="Date of the recorded activity (UTC day)">Date</th>
         <th class="h-base" title="Total miles driven for the day (converted from km reported by Geotab)">Distance (mi)</th>
         <th class="h-base" title="Total hours the vehicle was actively moving">Driving (hrs)</th>
@@ -154,7 +159,7 @@
         <th class="h-fuel" title="Gallons Per Hour = Fuel Used ÷ Engine ON Hours. Measures fuel burn rate — lower is more efficient.">Gallons / Hour</th>
         <th class="h-fuel" title="Hours Per Gallon = Engine ON Hours ÷ Fuel Used. Inverse of GPH — higher is better.">Hours / Gallon</th>
         <th class="h-ev" id="th-kwh"   style="display:none" title="Total electric energy consumed by EV assets in kilowatt-hours">Energy (kWh)</th>
-        <th class="h-ev" id="th-eveco" style="display:none" title="EV energy economy: kWh used per 100 miles driven. Lower means more efficient.">kWh / 100 mi</th>
+        <th class="h-ev" id="th-eveco" style="display:none" title="EV energy rate: total daily kWh ÷ driving hours. Lower means more efficient.">kWh / hr</th>
         <th class="h-util" title="Utilization = Driving Hours ÷ 21.7 hrs (Walmart threshold). Green ≥100%, Yellow ≥70%, Red &lt;70%.">Utilization</th>
       </tr>
     </thead>
@@ -209,9 +214,24 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('noData').style.display = 'none';
     document.getElementById('summary').classList.remove('show');
 
-    api.call('Get', { typeName: 'Device', search: {}, resultsLimit: 50000 }, function(devs) {
-      const nm = {};
-      (devs||[]).forEach(d => { nm[d.id] = d.name || d.id; });
+    // Read the org filter from the top-left selector; filter out the root group (= no filter)
+    const groupFilter = (state && state.getGroupFilter ? state.getGroupFilter() : [])
+      .filter(g => g.id !== 'GroupCompanyId');
+    const deviceSearch = groupFilter.length ? { groups: groupFilter } : {};
+
+    // Fetch devices (scoped to org filter) and all groups in one shot
+    api.multiCall([
+      ['Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }],
+      ['Get', { typeName: 'Group',  search: {},           resultsLimit: 10000 }]
+    ], function(initRes) {
+      const devs = initRes[0] || [], grps = initRes[1] || [];
+
+      const nm = {}, gm = {}, devGroups = {};
+      grps.forEach(g => { gm[g.id] = g.name || ''; });
+      devs.forEach(d => {
+        nm[d.id] = d.name || d.id;
+        devGroups[d.id] = (d.groups || []).map(g => gm[g.id]).filter(Boolean).join(', ');
+      });
 
       // Build one multiCall with a Trip + FuelAndEnergyUsed call per day.
       // Results come back in the same order: [trips_d0, fuel_d0, trips_d1, fuel_d1, ...]
@@ -229,13 +249,13 @@ geotab.addin.gphUtilization = function (api, state) {
           if (i % 2 === 0) (res || []).forEach(t => allTrips.push(t));
           else             (res || []).forEach(f => allFuel.push(f));
         });
-        process(nm, allTrips, allFuel);
+        process(nm, devGroups, allTrips, allFuel);
       }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
 
     }, function(e) { status('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
-  function process(nm, trips, fuel) {
+  function process(nm, devGroups, trips, fuel) {
     const tm = {}, fm = {};
     for (const t of trips) {
       const k = t.device.id + '|' + dk(t.start);
@@ -257,13 +277,13 @@ geotab.addin.gphUtilization = function (api, state) {
       const eH = t.dH + t.iH, mi = t.distKm * KM_TO_MI;
       if (kw > 0) hasEv = true;
       return {
-        name: nm[t.id] || t.id, date: t.date,
+        name: nm[t.id] || t.id, group: devGroups[t.id] || '', date: t.date,
         mi, dH: t.dH, iH: t.iH, eH,
         fg: fg > 0 ? fg : null,
-        gph:  (eH > 0 && fg > 0) ? fg / eH   : null,
-        hpg:  (fg > 0 && eH > 0) ? eH / fg   : null,
+        gph:  (eH > 0 && fg > 0) ? fg / eH  : null,
+        hpg:  (fg > 0 && eH > 0) ? eH / fg  : null,
         kw:   kw > 0 ? kw : null,
-        eco:  (kw > 0 && mi > 0) ? (kw/mi)*100 : null,
+        eco:  (kw > 0 && t.dH > 0) ? kw / t.dH : null,
         util: t.dH / THRESH
       };
     }).sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
@@ -289,6 +309,7 @@ geotab.addin.gphUtilization = function (api, state) {
       tb.insertAdjacentHTML('beforeend',
         '<tr>' +
         '<td>' + r.name + '</td>' +
+        '<td>' + r.group + '</td>' +
         '<td>' + r.date + '</td>' +
         nc(fix(r.mi,1)) + nc(fix(r.dH,2)) + nc(fix(r.iH,2)) + nc(fix(r.eH,2)) +
         nc(r.fg  != null ? fix(r.fg,3)  : null) +
@@ -320,11 +341,11 @@ geotab.addin.gphUtilization = function (api, state) {
 
   function exportXls() {
     if (!data.length) return;
-    const hdrs = ['Device','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
-    if (hasEv) hdrs.push('EV Energy Used (kWh)','EV Energy Economy (kWh/100mi)');
+    const hdrs = ['Device','Groups','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
+    if (hasEv) hdrs.push('EV Energy Used (kWh)','EV Energy Economy (kWh/hr)');
     hdrs.push('Utilization (%)');
     const ws = XLSX.utils.aoa_to_sheet([hdrs, ...data.map(r => {
-      const row = [r.name, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
+      const row = [r.name, r.group, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
         r.fg !=null?fix(r.fg,3):'', r.gph!=null?fix(r.gph,3):'', r.hpg!=null?fix(r.hpg,3):''];
       if (hasEv) row.push(r.kw!=null?fix(r.kw,2):'', r.eco!=null?fix(r.eco,2):'');
       row.push(fix(r.util * 100, 1)); return row;
