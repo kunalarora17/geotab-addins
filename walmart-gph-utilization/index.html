@@ -137,9 +137,10 @@
   <div class="grp-panel">
     <label>Filter by Group</label>
     <input type="text" class="grp-search" id="grpSearch" placeholder="Search groups…" autocomplete="off">
-    <select id="grpSelect" size="8" style="width:200px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-      <option value="">Loading groups…</option>
+    <select id="grpSelect" size="8" multiple style="width:200px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+      <option disabled>Loading groups…</option>
     </select>
+    <span style="font-size:10px;color:#888;">No selection = all groups</span>
   </div>
 </div>
 
@@ -212,7 +213,7 @@
 /* global geotab, XLSX */
 geotab.addin.gphUtilization = function (api, state) {
   const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, THRESH = 21.7;
-  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupId = '';
+  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupIds = [];
 
   function pts(ts) {
     if (!ts) return 0;
@@ -246,12 +247,6 @@ geotab.addin.gphUtilization = function (api, state) {
     const query = (q || '').toLowerCase().trim();
     const matches = query ? groupList.filter(g => g.name.toLowerCase().includes(query)) : groupList;
 
-    const allOpt = document.createElement('option');
-    allOpt.value = '';
-    allOpt.textContent = 'All Groups';
-    if (selectedGroupId === '') allOpt.selected = true;
-    sel.appendChild(allOpt);
-
     if (!matches.length && query) {
       const nm = document.createElement('option');
       nm.disabled = true;
@@ -262,7 +257,7 @@ geotab.addin.gphUtilization = function (api, state) {
         const opt = document.createElement('option');
         opt.value = g.id;
         opt.textContent = g.name;
-        if (selectedGroupId === g.id) opt.selected = true;
+        opt.selected = selectedGroupIds.includes(g.id);
         sel.appendChild(opt);
       });
     }
@@ -282,7 +277,7 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('noData').style.display = 'none';
     document.getElementById('cardsRow').classList.remove('show');
 
-    const deviceSearch = selectedGroupId ? { groups: [{ id: selectedGroupId }] } : {};
+    const deviceSearch = selectedGroupIds.length ? { groups: selectedGroupIds.map(id => ({ id })) } : {};
 
     api.call('Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }, function(devs) {
       const nm = {}, devGroups = {};
@@ -428,7 +423,7 @@ geotab.addin.gphUtilization = function (api, state) {
         buildGroupList(this.value);
       });
       document.getElementById('grpSelect').addEventListener('change', function() {
-        selectedGroupId = this.value;
+        selectedGroupIds = Array.from(this.selectedOptions).map(o => o.value);
       });
 
       api.call('Get', { typeName: 'Group', search: {}, resultsLimit: 10000 }, function(grps) {
