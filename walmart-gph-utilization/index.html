@@ -41,20 +41,6 @@
       font-size: 12px; color: #333; background: #fff; outline: none; width: 200px;
     }
     .grp-search:focus { border-color: #00457c; }
-    .grp-list {
-      width: 200px; height: 156px !important; max-height: 156px !important; overflow-y: auto !important;
-      border: 1px solid #ccc; border-radius: 3px; background: #fff;
-    }
-    .grp-item {
-      padding: 6px 10px; font-size: 12px; cursor: pointer;
-      border-bottom: 1px solid #f0f0f0; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-    .grp-item:last-child { border-bottom: none; }
-    .grp-item:hover { background: #f0f5ff; }
-    .grp-item.selected { background: #e8f0fe; font-weight: 600; color: #00457c; }
-    .grp-item.placeholder { color: #aaa; font-style: italic; cursor: default; }
-    .grp-item.placeholder:hover { background: none; }
 
     /* ── Status bar ── */
     .status-bar {
@@ -151,9 +137,9 @@
   <div class="grp-panel">
     <label>Filter by Group</label>
     <input type="text" class="grp-search" id="grpSearch" placeholder="Search groups…" autocomplete="off">
-    <div class="grp-list" id="grpList" style="display:block;width:200px;height:156px;max-height:156px;overflow-y:scroll;overflow-x:hidden;border:1px solid #ccc;border-radius:3px;background:#fff;">
-      <div class="grp-item placeholder">Loading groups…</div>
-    </div>
+    <select id="grpSelect" size="8" style="width:200px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:#fff;">
+      <option value="">Loading groups…</option>
+    </select>
   </div>
 </div>
 
@@ -252,42 +238,34 @@ geotab.addin.gphUtilization = function (api, state) {
     return days;
   }
 
-  // ── Group listbox ──
+  // ── Group select box ──
 
   function buildGroupList(q) {
-    const el = document.getElementById('grpList');
-    el.innerHTML = '';
+    const sel = document.getElementById('grpSelect');
+    sel.innerHTML = '';
     const query = (q || '').toLowerCase().trim();
     const matches = query ? groupList.filter(g => g.name.toLowerCase().includes(query)) : groupList;
 
-    const allItem = document.createElement('div');
-    allItem.className = 'grp-item' + (selectedGroupId === '' ? ' selected' : '');
-    allItem.textContent = 'All Groups';
-    allItem.addEventListener('click', () => selectGroup('', ''));
-    el.appendChild(allItem);
+    const allOpt = document.createElement('option');
+    allOpt.value = '';
+    allOpt.textContent = 'All Groups';
+    if (selectedGroupId === '') allOpt.selected = true;
+    sel.appendChild(allOpt);
 
     if (!matches.length && query) {
-      const nm = document.createElement('div');
-      nm.className = 'grp-item placeholder';
+      const nm = document.createElement('option');
+      nm.disabled = true;
       nm.textContent = 'No matches';
-      el.appendChild(nm);
+      sel.appendChild(nm);
     } else {
       matches.forEach(g => {
-        const item = document.createElement('div');
-        item.className = 'grp-item' + (selectedGroupId === g.id ? ' selected' : '');
-        item.textContent = g.name;
-        item.title = g.name;
-        item.addEventListener('click', () => selectGroup(g.id, g.name));
-        el.appendChild(item);
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.textContent = g.name;
+        if (selectedGroupId === g.id) opt.selected = true;
+        sel.appendChild(opt);
       });
     }
-  }
-
-  function selectGroup(id, name) {
-    selectedGroupId = id;
-    buildGroupList(document.getElementById('grpSearch').value);
-    const sel = document.getElementById('grpList').querySelector('.selected');
-    if (sel) sel.scrollIntoView({ block: 'nearest' });
   }
 
   // ── Run ──
@@ -445,8 +423,12 @@ geotab.addin.gphUtilization = function (api, state) {
       document.getElementById('toDate').value   = s;
       document.getElementById('runBtn').addEventListener('click', run);
       document.getElementById('exportBtn').addEventListener('click', exportXls);
+
       document.getElementById('grpSearch').addEventListener('input', function() {
         buildGroupList(this.value);
+      });
+      document.getElementById('grpSelect').addEventListener('change', function() {
+        selectedGroupId = this.value;
       });
 
       api.call('Get', { typeName: 'Group', search: {}, resultsLimit: 10000 }, function(grps) {
