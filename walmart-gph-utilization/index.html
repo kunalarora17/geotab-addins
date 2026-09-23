@@ -33,14 +33,15 @@
     .btn-export:hover { background: #1f4e38; }
     .btn:disabled { background: #aaa; cursor: not-allowed; }
 
-    /* ── Group filter panel ── */
+    /* ── Group filter ── */
     .grp-panel { display: flex; flex-direction: column; gap: 4px; }
     .grp-panel > label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #666; }
-    .grp-search {
-      border: 1px solid #ccc; border-radius: 3px; padding: 5px 8px;
-      font-size: 12px; color: #333; background: #fff; outline: none; width: 200px;
+    #grpWrap { position: relative; display: inline-block; }
+    #grpInput {
+      width: 200px; border: 1px solid #ccc; border-radius: 3px; padding: 5px 8px;
+      font-size: 12px; color: #333; background: #fff; outline: none; cursor: pointer;
     }
-    .grp-search:focus { border-color: #00457c; }
+    #grpInput:focus { border-color: #00457c; }
 
     /* ── Status bar ── */
     .status-bar {
@@ -136,11 +137,10 @@
   </div>
   <div class="grp-panel">
     <label>Filter by Group</label>
-    <input type="text" class="grp-search" id="grpSearch" placeholder="Search groups…" autocomplete="off">
-    <select id="grpSelect" size="8" multiple style="width:200px;font-size:12px;border:1px solid #ccc;border-radius:3px;background:#fff;">
-      <option disabled>Loading groups…</option>
-    </select>
-    <span style="font-size:10px;color:#888;">No selection = all groups</span>
+    <div id="grpWrap">
+      <input type="text" id="grpInput" placeholder="All Groups" autocomplete="off">
+      <div id="grpDrop"></div>
+    </div>
   </div>
 </div>
 
@@ -214,6 +214,7 @@
 geotab.addin.gphUtilization = function (api, state) {
   const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, THRESH = 21.7;
   let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupIds = [];
+  let dropOpen = false;
 
   function pts(ts) {
     if (!ts) return 0;
@@ -239,28 +240,100 @@ geotab.addin.gphUtilization = function (api, state) {
     return days;
   }
 
-  // ── Group select box ──
+  // ── Group dropdown ──
 
-  function buildGroupList(q) {
-    const sel = document.getElementById('grpSelect');
-    sel.innerHTML = '';
+  function openDrop() {
+    const drop = document.getElementById('grpDrop');
+    // setProperty with 'important' beats any external !important rule
+    drop.style.setProperty('display', 'block', 'important');
+    drop.style.setProperty('position', 'absolute', 'important');
+    drop.style.setProperty('top', '100%', 'important');
+    drop.style.setProperty('left', '0', 'important');
+    drop.style.setProperty('width', '200px', 'important');
+    drop.style.setProperty('max-height', '220px', 'important');
+    drop.style.setProperty('overflow-y', 'auto', 'important');
+    drop.style.setProperty('overflow-x', 'hidden', 'important');
+    drop.style.setProperty('background', '#fff', 'important');
+    drop.style.setProperty('border', '1px solid #ccc', 'important');
+    drop.style.setProperty('border-radius', '3px', 'important');
+    drop.style.setProperty('box-shadow', '0 4px 12px rgba(0,0,0,.15)', 'important');
+    drop.style.setProperty('z-index', '9999', 'important');
+    drop.style.setProperty('margin-top', '2px', 'important');
+    dropOpen = true;
+  }
+
+  function closeDrop() {
+    document.getElementById('grpDrop').style.setProperty('display', 'none', 'important');
+    dropOpen = false;
+    updateInputDisplay();
+  }
+
+  function updateInputDisplay() {
+    const inp = document.getElementById('grpInput');
+    if (selectedGroupIds.length === 0) {
+      inp.value = '';
+      inp.placeholder = 'All Groups';
+    } else if (selectedGroupIds.length === 1) {
+      const g = groupList.find(g => g.id === selectedGroupIds[0]);
+      inp.value = g ? g.name : '1 group selected';
+    } else {
+      inp.value = selectedGroupIds.length + ' groups selected';
+    }
+  }
+
+  function buildDropdown(q) {
+    const drop = document.getElementById('grpDrop');
+    drop.innerHTML = '';
     const query = (q || '').toLowerCase().trim();
     const matches = query ? groupList.filter(g => g.name.toLowerCase().includes(query)) : groupList;
 
-    if (!matches.length && query) {
-      const nm = document.createElement('option');
-      nm.disabled = true;
-      nm.textContent = 'No matches';
-      sel.appendChild(nm);
-    } else {
-      matches.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g.id;
-        opt.textContent = g.name;
-        opt.selected = selectedGroupIds.includes(g.id);
-        sel.appendChild(opt);
-      });
+    if (!matches.length) {
+      const nm = document.createElement('div');
+      nm.style.cssText = 'padding:7px 10px;font-size:12px;color:#aaa;font-style:italic;';
+      nm.textContent = query ? 'No matches' : 'No groups available';
+      drop.appendChild(nm);
+      return;
     }
+
+    matches.forEach(g => {
+      const item = document.createElement('div');
+      const sel = selectedGroupIds.includes(g.id);
+      item.style.cssText = 'padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f0f0;' +
+        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
+        (sel ? 'background:#e8f0fe;font-weight:600;color:#00457c;' : 'color:#333;');
+      item.textContent = (sel ? '✓ ' : '') + g.name;
+      item.title = g.name;
+      item.addEventListener('mousedown', function(e) {
+        e.preventDefault();
+        const idx = selectedGroupIds.indexOf(g.id);
+        if (idx === -1) selectedGroupIds.push(g.id);
+        else selectedGroupIds.splice(idx, 1);
+        buildDropdown(document.getElementById('grpInput').value);
+      });
+      drop.appendChild(item);
+    });
+  }
+
+  function initGroupDropdown() {
+    const inp  = document.getElementById('grpInput');
+    const drop = document.getElementById('grpDrop');
+    drop.style.setProperty('display', 'none', 'important');
+
+    inp.addEventListener('focus', function() {
+      this.select();
+      buildDropdown('');
+      openDrop();
+    });
+    inp.addEventListener('input', function() {
+      buildDropdown(this.value);
+      if (!dropOpen) openDrop();
+    });
+    inp.addEventListener('blur', function() {
+      setTimeout(closeDrop, 160);
+    });
+    document.addEventListener('click', function(e) {
+      if (!document.getElementById('grpWrap').contains(e.target)) closeDrop();
+    });
   }
 
   // ── Run ──
@@ -419,19 +492,13 @@ geotab.addin.gphUtilization = function (api, state) {
       document.getElementById('runBtn').addEventListener('click', run);
       document.getElementById('exportBtn').addEventListener('click', exportXls);
 
-      document.getElementById('grpSearch').addEventListener('input', function() {
-        buildGroupList(this.value);
-      });
-      document.getElementById('grpSelect').addEventListener('change', function() {
-        selectedGroupIds = Array.from(this.selectedOptions).map(o => o.value);
-      });
+      initGroupDropdown();
 
       api.call('Get', { typeName: 'Group', search: {}, resultsLimit: 10000 }, function(grps) {
         (grps || []).forEach(g => { if (g.id && g.name) gm[g.id] = g.name; });
         groupList = (grps || [])
           .filter(g => g.name && !g.id.startsWith('Group'))
           .sort((a, b) => a.name.localeCompare(b.name));
-        buildGroupList('');
       });
 
       cb();
