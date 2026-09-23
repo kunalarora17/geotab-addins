@@ -120,27 +120,11 @@
 
 <div class="status-bar" id="statusBar"></div>
 
-<div class="cards" id="cardsRow">
-  <div class="card">
-    <div class="card-label">Total Rows</div>
-    <div class="card-value" id="sCount">—</div>
-    <div class="card-sub">asset-days</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Avg GPH</div>
-    <div class="card-value" id="sGph">—</div>
-    <div class="card-sub">gal / engine-on hour</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Avg Utilization</div>
-    <div class="card-value" id="sUtil">—</div>
-    <div class="card-sub">vs 21.7 hr threshold</div>
-  </div>
-  <div class="card" id="sEvCard" style="display:none">
-    <div class="card-label">Avg kWh/day</div>
-    <div class="card-value" id="sKwh">—</div>
-    <div class="card-sub">EV assets only</div>
-  </div>
+<div id="cardsRow" style="display:none;background:#fff;border-bottom:1px solid #ddd;padding:8px 16px;font-size:12px;">
+  <span style="margin-right:28px;">Total Rows: <b id="sCount">—</b></span>
+  <span style="margin-right:28px;">Avg GPH: <b id="sGph">—</b></span>
+  <span style="margin-right:28px;">Avg Utilization: <b id="sUtil">—</b></span>
+  <span id="sEvCard" style="display:none;margin-right:28px;">Avg kWh/day: <b id="sKwh">—</b></span>
 </div>
 
 <div class="tbl-outer">
@@ -408,7 +392,7 @@ geotab.addin.gphUtilization = function (api, state) {
       tb.insertAdjacentHTML('beforeend',
         '<tr>' +
         '<td>' + r.name  + '</td>' +
-        '<td>' + r.group + '</td>' +
+        '<td title="' + r.group.replace(/"/g, '&quot;') + '">' + (r.group.length > 15 ? r.group.slice(0, 14) + '…' : r.group) + '</td>' +
         '<td>' + r.date  + '</td>' +
         nc(fix(r.mi,1)) + nc(fix(r.dH,2)) + nc(fix(r.iH,2)) + nc(fix(r.eH,2)) +
         nc(r.fg  != null ? fix(r.fg,3)  : null) +
@@ -433,15 +417,9 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s, r) => s + r.gph, 0) / gr.length).toFixed(3) : '—';
     if (kr.length) {
       document.getElementById('sKwh').textContent = (kr.reduce((s, r) => s + r.kw, 0) / kr.length).toFixed(2);
-      document.getElementById('sEvCard').style.setProperty('display', 'block', 'important');
+      document.getElementById('sEvCard').style.setProperty('display', 'inline', 'important');
     }
-    const cards = document.getElementById('cardsRow');
-    cards.style.setProperty('display', 'flex', 'important');
-    cards.style.setProperty('flex-direction', 'row', 'important');
-    cards.style.setProperty('flex-wrap', 'wrap', 'important');
-    cards.style.setProperty('gap', '12px', 'important');
-    cards.style.setProperty('align-items', 'stretch', 'important');
-    cards.style.setProperty('padding', '12px 16px 0', 'important');
+    document.getElementById('cardsRow').style.setProperty('display', 'block', 'important');
   }
 
   function exportXls() {
