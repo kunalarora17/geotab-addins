@@ -110,7 +110,10 @@
   </div>
   <div class="grp-panel" id="grpPanel">
     <label>Filter by Group</label>
-    <input type="text" id="grpInput" placeholder="All Groups — click to filter" autocomplete="off">
+    <div style="display:inline-flex;align-items:center;gap:4px;">
+      <input type="text" id="grpInput" placeholder="All Groups — click to filter" autocomplete="off">
+      <button id="grpClear" title="Clear selection" style="display:none;border:none;background:none;cursor:pointer;font-size:18px;color:#999;padding:0 2px;line-height:1;">&times;</button>
+    </div>
     <select id="grpSelect" multiple size="8"></select>
   </div>
 </div>
@@ -223,14 +226,18 @@ geotab.addin.gphUtilization = function (api, state) {
 
   function updateInputDisplay() {
     const inp = document.getElementById('grpInput');
+    const clr = document.getElementById('grpClear');
     if (selectedGroupIds.length === 0) {
       inp.value = '';
       inp.placeholder = 'All Groups — click to filter';
+      clr.style.display = 'none';
     } else if (selectedGroupIds.length === 1) {
       const g = groupList.find(g => g.id === selectedGroupIds[0]);
       inp.value = g ? g.name : '1 group selected';
+      clr.style.display = '';
     } else {
       inp.value = selectedGroupIds.length + ' groups selected';
+      clr.style.display = '';
     }
   }
 
@@ -294,6 +301,13 @@ geotab.addin.gphUtilization = function (api, state) {
     // Escape → hide select
     inp.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') { hideSelect(); inp.blur(); }
+    });
+
+    // Clear button → reset selection
+    document.getElementById('grpClear').addEventListener('click', function() {
+      selectedGroupIds = [];
+      updateInputDisplay();
+      hideSelect();
     });
   }
 
