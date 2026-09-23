@@ -308,7 +308,7 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('exportBtn').disabled = true;
     document.getElementById('tbl').style.display = 'none';
     document.getElementById('noData').style.display = 'none';
-    document.getElementById('cardsRow').classList.remove('show');
+    document.getElementById('cardsRow').style.setProperty('display', 'none', 'important');
 
     const deviceSearch = selectedGroupIds.length ? { groups: selectedGroupIds.map(id => ({ id })) } : {};
 
@@ -414,9 +414,15 @@ geotab.addin.gphUtilization = function (api, state) {
     document.getElementById('sGph').textContent   = gr.length ? (gr.reduce((s, r) => s + r.gph, 0) / gr.length).toFixed(3) : '—';
     if (kr.length) {
       document.getElementById('sKwh').textContent = (kr.reduce((s, r) => s + r.kw, 0) / kr.length).toFixed(2);
-      document.getElementById('sEvCard').style.display = '';
+      document.getElementById('sEvCard').style.setProperty('display', 'block', 'important');
     }
-    document.getElementById('cardsRow').classList.add('show');
+    const cards = document.getElementById('cardsRow');
+    cards.style.setProperty('display', 'flex', 'important');
+    cards.style.setProperty('flex-direction', 'row', 'important');
+    cards.style.setProperty('flex-wrap', 'wrap', 'important');
+    cards.style.setProperty('gap', '12px', 'important');
+    cards.style.setProperty('align-items', 'stretch', 'important');
+    cards.style.setProperty('padding', '12px 16px 0', 'important');
   }
 
   function exportXls() {
