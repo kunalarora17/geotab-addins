@@ -143,7 +143,7 @@
 <div class="tbl-outer">
   <table id="tbl" style="display:none">
     <colgroup>
-      <col class="c-name"><col class="c-group"><col class="c-date">
+      <col class="c-name"><col class="c-date">
       <col class="c-num"><col class="c-num"><col class="c-num"><col class="c-num">
       <col class="c-num"><col class="c-num"><col class="c-num">
       <col class="c-num" id="col-kwh" style="display:none">
@@ -153,7 +153,6 @@
     <thead>
       <tr>
         <th class="h-base" title="Asset / vehicle name as configured in MyGeotab">Asset Name</th>
-        <th class="h-base" title="MyGeotab group(s) the asset belongs to">Groups</th>
         <th class="h-base" title="Date of the recorded activity (UTC day)">Date</th>
         <th class="h-base" title="Total miles driven for the day (converted from km)">Distance (mi)</th>
         <th class="h-base" title="Total hours the vehicle was actively moving">Driving (hrs)</th>
@@ -314,11 +313,8 @@ geotab.addin.gphUtilization = function (api, state) {
     const deviceSearch = selectedGroupIds.length ? { groups: selectedGroupIds.map(id => ({ id })) } : {};
 
     api.call('Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }, function(devs) {
-      const nm = {}, devGroups = {};
-      (devs || []).forEach(d => {
-        nm[d.id] = d.name || d.id;
-        devGroups[d.id] = (d.groups || []).map(g => gm[g.id]).filter(Boolean).join(', ');
-      });
+      const nm = {};
+      (devs || []).forEach(d => { if (d.name) nm[d.id] = d.name; });
 
       const days = getDays(from, to);
       const calls = [];
@@ -334,13 +330,13 @@ geotab.addin.gphUtilization = function (api, state) {
           if (i % 2 === 0) (res || []).forEach(t => allTrips.push(t));
           else             (res || []).forEach(f => allFuel.push(f));
         });
-        process(nm, devGroups, allTrips, allFuel);
+        process(nm, allTrips, allFuel);
       }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
 
     }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
-  function process(nm, devGroups, trips, fuel) {
+  function process(nm, trips, fuel) {
     const tm = {}, fm = {};
     for (const t of trips) {
       const k = t.device.id + '|' + dk(t.start);
@@ -356,13 +352,13 @@ geotab.addin.gphUtilization = function (api, state) {
       fm[k].kWh += f.totalEnergyUsedKwh || 0;
     }
     hasEv = false;
-    data = Object.entries(tm).map(([k, t]) => {
+    data = Object.entries(tm).filter(([, t]) => nm[t.id]).map(([k, t]) => {
       const fe = fm[k] || { fL: 0, kWh: 0 };
       const fg = fe.fL * L_TO_GAL, kw = fe.kWh;
       const eH = t.dH + t.iH, mi = t.distKm * KM_TO_MI;
       if (kw > 0) hasEv = true;
       return {
-        name: nm[t.id] || t.id, group: devGroups[t.id] || '', date: t.date,
+        name: nm[t.id], date: t.date,
         mi, dH: t.dH, iH: t.iH, eH,
         fg:  fg > 0 ? fg : null,
         gph: (eH > 0 && fg > 0) ? fg / eH    : null,
@@ -393,9 +389,8 @@ geotab.addin.gphUtilization = function (api, state) {
       const ev  = hasEv ? nc(r.kw != null ? fix(r.kw, 2) : null) + nc(r.eco != null ? fix(r.eco, 2) : null) : '';
       tb.insertAdjacentHTML('beforeend',
         '<tr>' +
-        '<td>' + r.name  + '</td>' +
-        '<td>' + r.group + '</td>' +
-        '<td>' + r.date  + '</td>' +
+        '<td>' + r.name + '</td>' +
+        '<td>' + r.date + '</td>' +
         nc(fix(r.mi,1)) + nc(fix(r.dH,2)) + nc(fix(r.iH,2)) + nc(fix(r.eH,2)) +
         nc(r.fg  != null ? fix(r.fg,3)  : null) +
         nc(r.gph != null ? fix(r.gph,3) : null) +
@@ -426,11 +421,11 @@ geotab.addin.gphUtilization = function (api, state) {
 
   function exportXls() {
     if (!data.length) return;
-    const hdrs = ['Device','Groups','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
+    const hdrs = ['Asset Name','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
     if (hasEv) hdrs.push('EV Energy Used (kWh)', 'EV Energy Economy (kWh/hr)');
     hdrs.push('Utilization (%)');
     const ws = XLSX.utils.aoa_to_sheet([hdrs, ...data.map(r => {
-      const row = [r.name, r.group, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
+      const row = [r.name, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
         r.fg  != null ? fix(r.fg,3)  : '',
         r.gph != null ? fix(r.gph,3) : '',
         r.hpg != null ? fix(r.hpg,3) : ''];
