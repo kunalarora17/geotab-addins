@@ -24,6 +24,7 @@
       font-size: 12px; color: #333; background: #fff; outline: none; width: 138px;
     }
     .field input[type=date]:focus { border-color: #00457c; }
+    .field input[type=number]:focus { border-color: #00457c; outline: none; }
     .btn { height: 30px; padding: 0 14px; border: none; border-radius: 3px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .btn-run    { background: #00457c; color: #fff; }
     .btn-run:hover    { background: #003566; }
@@ -98,13 +99,17 @@
 
 <div class="header">
   <h1>GPH &amp; Utilization Report</h1>
-  <p>Fuel &bull; EV energy &bull; Utilization (21.7 hr threshold) &bull; Hover column headers for definitions</p>
+  <p>Fuel &bull; EV energy &bull; Utilization (configurable threshold) &bull; Hover column headers for definitions</p>
 </div>
 
 <div class="controls">
   <div class="ctrl-main">
     <div class="field"><label>From Date</label><input type="date" id="fromDate"></div>
     <div class="field"><label>To Date</label><input type="date" id="toDate"></div>
+    <div class="field">
+      <label>Util Threshold (hrs/day)</label>
+      <input type="number" id="threshInput" value="21.7" step="0.1" min="0.1" style="width:90px;border:1px solid #ccc;border-radius:3px;padding:5px 8px;font-size:12px;color:#333;background:#fff;outline:none;">
+    </div>
     <button class="btn btn-run" id="runBtn">Run Report</button>
     <button class="btn btn-export" id="exportBtn" disabled>Export to Excel</button>
   </div>
@@ -151,7 +156,7 @@
         <th class="h-fuel" title="Hours Per Gallon = Engine ON Hours ÷ Fuel Used">Hours / Gallon</th>
         <th class="h-ev" id="th-kwh" style="display:none" title="Total electric energy consumed in kWh">Energy (kWh)</th>
         <th class="h-ev" id="th-eveco" style="display:none" title="kWh ÷ driving hours">kWh / hr</th>
-        <th class="h-util" title="Driving Hours ÷ 21.7 hrs. Green ≥100%, Yellow ≥70%, Red &lt;70%">Utilization</th>
+        <th class="h-util" id="th-util" title="Driving Hours ÷ threshold hrs. Green ≥100%, Yellow ≥70%, Red &lt;70%">Utilization</th>
       </tr>
     </thead>
     <tbody id="tbody"></tbody>
@@ -163,8 +168,8 @@
 <script>
 /* global geotab, XLSX */
 geotab.addin.gphUtilization = function (api, state) {
-  const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, THRESH = 21.7;
-  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupIds = [];
+  const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, DEFAULT_THRESH = 21.7;
+  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupIds = [], tzMap = {};
 
   function pts(ts) {
     if (!ts) return 0;
@@ -173,8 +178,22 @@ geotab.addin.gphUtilization = function (api, state) {
     const [h, m, x] = s.split(':').map(parseFloat);
     return d * 24 + (h||0) + (m||0)/60 + (x||0)/3600;
   }
-  const dk  = dt => String(dt).slice(0, 10);
-  const fix = (n, dp) => (n == null || isNaN(n)) ? null : +n.toFixed(dp);
+  const dk    = dt => String(dt).slice(0, 10);
+  const fix   = (n, dp) => (n == null || isNaN(n)) ? null : +n.toFixed(dp);
+
+  function dkLocal(dt, tzId) {
+    if (!tzId) return String(dt).slice(0, 10);
+    try { return new Date(dt).toLocaleDateString('en-CA', { timeZone: tzId }); }
+    catch { return String(dt).slice(0, 10); }
+  }
+
+  function tzAbbr(tzId, dt) {
+    if (!tzId) return 'UTC';
+    try {
+      return new Intl.DateTimeFormat('en-US', { timeZone: tzId, timeZoneName: 'short' })
+        .formatToParts(new Date(dt)).find(p => p.type === 'timeZoneName')?.value || 'UTC';
+    } catch { return 'UTC'; }
+  }
 
   function setStatus(msg, err) {
     const el = document.getElementById('statusBar');
@@ -301,6 +320,7 @@ geotab.addin.gphUtilization = function (api, state) {
     const from = document.getElementById('fromDate').value;
     const to   = document.getElementById('toDate').value;
     if (!from || !to) { setStatus('Select a date range.', true); return; }
+    const thresh = parseFloat(document.getElementById('threshInput').value) || DEFAULT_THRESH;
 
     setStatus('Loading…');
     document.getElementById('runBtn').disabled = true;
@@ -316,6 +336,7 @@ geotab.addin.gphUtilization = function (api, state) {
       (devs || []).forEach(d => {
         if (d.name) nm[d.id] = d.name;
         devGroups[d.id] = (d.groups || []).map(g => gm[g.id]).filter(Boolean).join(', ');
+        tzMap[d.id] = d.timeZoneId || null;
       });
 
       const days = getDays(from, to);
@@ -332,23 +353,26 @@ geotab.addin.gphUtilization = function (api, state) {
           if (i % 2 === 0) (res || []).forEach(t => allTrips.push(t));
           else             (res || []).forEach(f => allFuel.push(f));
         });
-        process(nm, devGroups, allTrips, allFuel);
+        process(nm, devGroups, allTrips, allFuel, thresh);
       }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
 
     }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
   }
 
-  function process(nm, devGroups, trips, fuel) {
+  function process(nm, devGroups, trips, fuel, thresh) {
     const tm = {}, fm = {};
     for (const t of trips) {
-      const k = t.device.id + '|' + dk(t.start);
-      if (!tm[k]) tm[k] = { id: t.device.id, date: dk(t.start), distKm: 0, dH: 0, iH: 0 };
+      const tz = tzMap[t.device.id] || null;
+      const localDate = dkLocal(t.start, tz);
+      const k = t.device.id + '|' + localDate;
+      if (!tm[k]) tm[k] = { id: t.device.id, date: localDate, tz: tzAbbr(tz, t.start), distKm: 0, dH: 0, iH: 0 };
       tm[k].distKm += t.distance || 0;
       tm[k].dH += pts(t.drivingDuration);
       tm[k].iH += pts(t.idlingDuration);
     }
     for (const f of fuel) {
-      const k = f.device.id + '|' + dk(f.dateTime);
+      const tz = tzMap[f.device.id] || null;
+      const k = f.device.id + '|' + dkLocal(f.dateTime, tz);
       if (!fm[k]) fm[k] = { fL: 0, kWh: 0 };
       fm[k].fL  += f.totalFuelUsed      || 0;
       fm[k].kWh += f.totalEnergyUsedKwh || 0;
@@ -360,21 +384,23 @@ geotab.addin.gphUtilization = function (api, state) {
       const eH = t.dH + t.iH, mi = t.distKm * KM_TO_MI;
       if (kw > 0) hasEv = true;
       return {
-        name: nm[t.id], group: devGroups[t.id] || '', date: t.date,
+        name: nm[t.id], group: devGroups[t.id] || '', date: t.date, tz: t.tz,
         mi, dH: t.dH, iH: t.iH, eH,
         fg:  fg > 0 ? fg : null,
         gph: (eH > 0 && fg > 0) ? fg / eH    : null,
         hpg: (fg > 0 && eH > 0) ? eH / fg    : null,
         kw:  kw > 0 ? kw : null,
         eco: (kw > 0 && t.dH > 0) ? kw / t.dH : null,
-        util: t.dH / THRESH
+        util: t.dH / thresh
       };
     }).sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
 
     ['th-kwh','th-eveco','col-kwh','col-eveco'].forEach(id => {
       document.getElementById(id).style.display = hasEv ? '' : 'none';
     });
-    render(data); renderSummary(data); setStatus(null);
+    const thUtil = document.getElementById('th-util');
+    thUtil.title = 'Driving Hours ÷ ' + thresh + ' hrs. Green ≥100%, Yellow ≥70%, Red <70%';
+    render(data, thresh); renderSummary(data); setStatus(null);
     document.getElementById('runBtn').disabled = false;
     document.getElementById('exportBtn').disabled = data.length === 0;
   }
@@ -382,18 +408,19 @@ geotab.addin.gphUtilization = function (api, state) {
   function uc(u) { return u >= 1 ? '#276749' : u >= 0.7 ? '#b7791f' : '#c53030'; }
   function nc(v)  { return v != null ? '<td>' + v + '</td>' : '<td class="na">—</td>'; }
 
-  function render(rows) {
+  function render(rows, thresh) {
     const tb = document.getElementById('tbody');
     tb.innerHTML = '';
     if (!rows.length) { document.getElementById('noData').style.display = 'block'; return; }
     rows.forEach(r => {
       const col = uc(r.util), bw = Math.min(r.util, 1) * 46;
       const ev  = hasEv ? nc(r.kw != null ? fix(r.kw, 2) : null) + nc(r.eco != null ? fix(r.eco, 2) : null) : '';
+      const dateCell = r.tz ? r.date + ' <span style="color:#999;font-size:10px">(' + r.tz + ')</span>' : r.date;
       tb.insertAdjacentHTML('beforeend',
         '<tr>' +
         '<td>' + r.name  + '</td>' +
         '<td title="' + r.group.replace(/"/g, '&quot;') + '">' + (r.group.length > 15 ? r.group.slice(0, 14) + '…' : r.group) + '</td>' +
-        '<td>' + r.date  + '</td>' +
+        '<td>' + dateCell + '</td>' +
         nc(fix(r.mi,1)) + nc(fix(r.dH,2)) + nc(fix(r.iH,2)) + nc(fix(r.eH,2)) +
         nc(r.fg  != null ? fix(r.fg,3)  : null) +
         nc(r.gph != null ? fix(r.gph,3) : null) +
@@ -424,11 +451,12 @@ geotab.addin.gphUtilization = function (api, state) {
 
   function exportXls() {
     if (!data.length) return;
-    const hdrs = ['Asset Name','Group','Date','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
+    const usedThresh = parseFloat(document.getElementById('threshInput').value) || DEFAULT_THRESH;
+    const hdrs = ['Asset Name','Group','Date (Local)','Timezone','Distance Driven (mi)','Driving Duration (hrs)','Idling Duration (hrs)','Engine ON Hours','Fuel Used (gal)','Gallons/Hour','Hours Per Gallon'];
     if (hasEv) hdrs.push('EV Energy Used (kWh)', 'EV Energy Economy (kWh/hr)');
-    hdrs.push('Utilization (%)');
+    hdrs.push('Utilization (%) [÷' + usedThresh + 'h]');
     const ws = XLSX.utils.aoa_to_sheet([hdrs, ...data.map(r => {
-      const row = [r.name, r.group, r.date, fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
+      const row = [r.name, r.group, r.date, r.tz || 'UTC', fix(r.mi,1), fix(r.dH,2), fix(r.iH,2), fix(r.eH,2),
         r.fg  != null ? fix(r.fg,3)  : '',
         r.gph != null ? fix(r.gph,3) : '',
         r.hpg != null ? fix(r.hpg,3) : ''];
