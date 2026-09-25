@@ -28,9 +28,16 @@
     .btn { height: 30px; padding: 0 14px; border: none; border-radius: 3px; font-size: 12px; font-weight: 600; cursor: pointer; }
     .btn-run    { background: #00457c; color: #fff; }
     .btn-run:hover    { background: #003566; }
+    .btn-cancel { background: #c53030; color: #fff; display: none; }
+    .btn-cancel:hover { background: #9b2c2c; }
     .btn-export { background: #2d6a4f; color: #fff; }
     .btn-export:hover { background: #1f4e38; }
     .btn:disabled { background: #aaa; cursor: not-allowed; }
+
+    .disclaimer {
+      background: #fff8e1; border-left: 3px solid #f59e0b; padding: 6px 16px;
+      font-size: 11px; color: #78350f;
+    }
 
     .grp-panel { display: flex; flex-direction: column; gap: 4px; }
     .grp-panel > label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #666; }
@@ -101,6 +108,9 @@
   <h1>GPH &amp; Utilization Report</h1>
   <p>Fuel &bull; EV energy &bull; Utilization (configurable threshold) &bull; Hover column headers for definitions</p>
 </div>
+<div class="disclaimer">
+  ⚠️ This is a custom add-in and is not standard Geotab functionality. It is not covered by Geotab's SLA or support agreements.
+</div>
 
 <div class="controls">
   <div class="ctrl-main">
@@ -111,6 +121,7 @@
       <input type="number" id="threshInput" value="21.7" step="0.1" min="0.1" style="width:90px;border:1px solid #ccc;border-radius:3px;padding:5px 8px;font-size:12px;color:#333;background:#fff;outline:none;">
     </div>
     <button class="btn btn-run" id="runBtn">Run Report</button>
+    <button class="btn btn-cancel" id="cancelBtn">Cancel</button>
     <button class="btn btn-export" id="exportBtn" disabled>Export to Excel</button>
   </div>
   <div class="grp-panel" id="grpPanel">
@@ -169,7 +180,16 @@
 /* global geotab, XLSX */
 geotab.addin.gphUtilization = function (api, state) {
   const KM_TO_MI = 0.621371, L_TO_GAL = 1 / 3.78541, DEFAULT_THRESH = 21.7;
-  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupIds = [], tzMap = {};
+  let data = [], hasEv = false, gm = {}, groupList = [], selectedGroupIds = [], tzMap = {}, cancelled = false;
+
+  function setCancelVisible(show) {
+    document.getElementById('cancelBtn').style.display = show ? '' : 'none';
+  }
+
+  function resetRunState() {
+    document.getElementById('runBtn').disabled = false;
+    setCancelVisible(false);
+  }
 
   function pts(ts) {
     if (!ts) return 0;
@@ -322,16 +342,19 @@ geotab.addin.gphUtilization = function (api, state) {
     if (!from || !to) { setStatus('Select a date range.', true); return; }
     const thresh = parseFloat(document.getElementById('threshInput').value) || DEFAULT_THRESH;
 
+    cancelled = false;
     setStatus('Loading…');
     document.getElementById('runBtn').disabled = true;
     document.getElementById('exportBtn').disabled = true;
     document.getElementById('tbl').style.display = 'none';
     document.getElementById('noData').style.display = 'none';
     document.getElementById('cardsRow').style.setProperty('display', 'none', 'important');
+    setCancelVisible(true);
 
     const deviceSearch = selectedGroupIds.length ? { groups: selectedGroupIds.map(id => ({ id })) } : {};
 
     api.call('Get', { typeName: 'Device', search: deviceSearch, resultsLimit: 50000 }, function(devs) {
+      if (cancelled) { setStatus('Report cancelled.'); resetRunState(); return; }
       const nm = {}, devGroups = {};
       (devs || []).forEach(d => {
         if (d.name) nm[d.id] = d.name;
@@ -348,15 +371,16 @@ geotab.addin.gphUtilization = function (api, state) {
       });
 
       api.multiCall(calls, function(results) {
+        if (cancelled) { setStatus('Report cancelled.'); resetRunState(); return; }
         const allTrips = [], allFuel = [];
         results.forEach((res, i) => {
           if (i % 2 === 0) (res || []).forEach(t => allTrips.push(t));
           else             (res || []).forEach(f => allFuel.push(f));
         });
         process(nm, devGroups, allTrips, allFuel, thresh);
-      }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
+      }, function(e) { setStatus('Error: ' + e, true); resetRunState(); });
 
-    }, function(e) { setStatus('Error: ' + e, true); document.getElementById('runBtn').disabled = false; });
+    }, function(e) { setStatus('Error: ' + e, true); resetRunState(); });
   }
 
   function process(nm, devGroups, trips, fuel, thresh) {
@@ -401,7 +425,7 @@ geotab.addin.gphUtilization = function (api, state) {
     const thUtil = document.getElementById('th-util');
     thUtil.title = 'Driving Hours ÷ ' + thresh + ' hrs. Green ≥100%, Yellow ≥70%, Red <70%';
     render(data, thresh); renderSummary(data); setStatus(null);
-    document.getElementById('runBtn').disabled = false;
+    resetRunState();
     document.getElementById('exportBtn').disabled = data.length === 0;
   }
 
@@ -477,6 +501,11 @@ geotab.addin.gphUtilization = function (api, state) {
       document.getElementById('fromDate').value = s;
       document.getElementById('toDate').value   = s;
       document.getElementById('runBtn').addEventListener('click', run);
+      document.getElementById('cancelBtn').addEventListener('click', function() {
+        cancelled = true;
+        setCancelVisible(false);
+        setStatus('Cancelling…');
+      });
       document.getElementById('exportBtn').addEventListener('click', exportXls);
 
       initGroupFilter();
